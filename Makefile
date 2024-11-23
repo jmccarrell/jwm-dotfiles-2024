@@ -4,10 +4,10 @@ TEST_DIR := $(HOME)/tmp/test-dotfiles
 all: test
 
 install: $(INSTALL_DIR)
-	stow --ignore=Makefile -t $(INSTALL_DIR) -S .
+	stow --verbose --ignore=Makefile -t $(INSTALL_DIR) -S .
 
 test: $(TEST_DIR)
-	stow --ignore=Makefile -t $(TEST_DIR) -S .
+	stow --verbose --ignore=Makefile -t $(TEST_DIR) -S .
 
 .PHONY: clean
 

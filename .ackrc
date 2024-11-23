@@ -1,0 +1,25 @@
+# turn off grouping; from http://dotfiles.org/~petdance/.ackrc
+#  noheading == print filename match on same line as match content, like grep
+--noheading
+--break
+
+# search in .txt files
+--type-add=tt=.txt
+
+# add velocity templates to java search types
+--type-add=java=.vm
+
+# don't search in haskell / stack build artifacts
+--ignore-directory=.stack-work
+
+# don't search in log directories
+--ignore-directory=log
+
+# and dont search statically defined stuff
+--ignore-directory=static
+
+# and don't search mathjax
+--ignore-directory=mathjax
+
+# or vendor stuff
+--ignore-directory=vendor
