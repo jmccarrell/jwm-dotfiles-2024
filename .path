@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# set my path exactly how I want it.
+
+# declare jeffs home paths
+function jwm_home_paths() {
+    local -a jwm_paths=($HOME/bin
+                        $HOME/.local/bin
+                        $HOME/.rbenv/shims
+                        $HOME/.rbenv/bin
+                       )
+
+    printf "%s\n" "${jwm_paths[@]}"
+}
+
+
+# define GOPATH, and set PATH from GOPATH as needed.
+function jwm_go_locations() {
+    declare -a go_locations=( ${HOME}/go )
+
+    printf "%s\n" "${go_locations[@]}"
+}
+
+# return every go project as a list of of lines
+function jwm_go_paths() {
+    declare -a go_paths=()
+    declare -a go_locations=( $(jwm_go_locations) )
+    if (( ${#go_locations[@]} > 0 )); then
+        for gp in ${go_locations[@]}; do
+            if [[ -e $gp && -e ${gp}/bin ]]; then
+                go_paths+=($gp)
+            fi
+        done
+    fi
+    printf "%s\n" "${go_paths[@]}"
+}
+
+# return the bin directory for every go project as a list of lines
+function jwm_go_bin_paths() {
+    declare -a go_locs=( $(jwm_go_locations) )
+    declare -a go_bin_paths=()
+    for gl in ${go_locs[@]}; do
+        if [[ -e $gl && -e $gl/bin ]]; then
+            go_bin_paths+=($gl/bin)
+        fi
+    done
+
+    printf "%s\n" "${go_bin_paths[@]}"
+}
+
+function jwm_standard_paths() {
+    paths_fname=/etc/paths
+    if [[ -f ${paths_fname} && -r ${paths_fname} ]]; then
+        /bin/cat < $paths_fname
+    else
+        standard_paths=("/usr/local/bin" "/usr/bin" "/bin")
+        printf "%s\n" "${standard_paths[@]}"
+    fi
+}
+
+function jwm_opt_homebrew_path() {
+    printf "/opt/homebrew/bin\n"
+}
+
+function jwm_gcloud_sdk_path() {
+    # gcloud_sdk_bin='/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/bin'
+    gcloud_sdk_bin="${HOME}/google-cloud-sdk/bin"
+    result=''
+    if [ -e "$gcloud_sdk_bin" ]; then
+        result="$gcloud_sdk_bin"
+    fi
+    printf "$result"
+}
+
+function jwm_set_path() {
+    # create a standard simple path
+    local -a std_paths=()
+    while IFS= read -r dir; do
+        std_paths+=($dir)
+    done < <( jwm_standard_paths )
+
+    # IDK how to write 2 commands in the <( ) syntax, so just repeat the loop
+    while IFS= read -r dir; do
+        std_paths+=($dir)
+    done < <( jwm_opt_homebrew_path )
+    # declare -p std_paths
+
+    # recall [@]:0:1 expands the array; then extracts the zero-th element of length 1
+    # ie, this is a zsh/bash portable way to write ${array[0]}
+    local std_path=${std_paths[@]:0:1}
+    # declare -p std_path
+    for dir in ${std_paths[@]:1}; do
+        std_path+=":${dir}"
+    done
+    # declare -p std_path
+    PATH=$std_path
+
+    # then let brew, etc. do their thing
+    # let brew do its thing
+    if command -v brew 1>/dev/null 2>&1; then eval $(brew shellenv); fi
+
+    # let pyenv do its thing last
+    if command -v pyenv > /dev/null; then eval "$(pyenv init -)"; fi
+    if command -v pyenv-virtualenv-init > /dev/null; then eval "$(pyenv virtualenv-init -)"; fi
+
+    # let sdkman do its thing
+    [[ -s "${HOME}/.sdkman/bin/sdkman-init.sh" ]] && source "${HOME}/.sdkman/bin/sdkman-init.sh"
+
+    # then prepend my preferred paths
+    # first, remove any duplicate path elements
+    local -A dedup
+    local -a result=()
+
+    for dir in \
+        $(jwm_home_paths) \
+        $(jwm_go_bin_paths) \
+        $(jwm_gcloud_sdk_path) \
+        ; do
+        if [ ${dedup[$dir]+_} ]; then
+            continue
+        fi
+        dedup[${dir}]=1
+
+        if [[ -e $dir ]]; then
+            result+=($dir)
+        fi
+    done
+
+    # now prepend our paths in reverse order
+    # apparently, the only posixly correct (both zsh and bash) is to:
+    # set, and then expand the positional parameters.
+    # cf: https://unix.stackexchange.com/a/27400/138583
+    set -- ${result[@]}
+    i=$#
+    while [ $i -gt 0 ]; do
+        eval "dir=\${$i}"
+        PATH="${dir}:${PATH}"
+        i=$((i-1))
+    done
+}
