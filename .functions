@@ -266,8 +266,9 @@ gs_notes() {
 }
 
 gs_dotfiles() {
-    git_sync $(jwm_dir)/proj/jwm-dotfiles origin  # github-jwm
-    git_sync $(jwm_dir)/proj/jeff-dotfiles origin  # github-jwm
+    git_sync $(jwm_dir)/proj/jwm-dotfiles-2024 origin
+    git_sync $(jwm_dir)/proj/jwm-dotfiles origin
+    git_sync $(jwm_dir)/proj/jeff-dotfiles origin
 }
 
 gs_jwm_bin() {
@@ -304,14 +305,14 @@ gs_course_java_oo_specialization() {
 
 
 gs_jwm() {
-    gs_todo  # github-jwm
-    gs_notes  # bitbucket
-    gs_literate-emacs-d  # github-jwm
-    gs_dotfiles  # github-jwm
-    gs_jwm_bin  # github-jwm
+    gs_todo
+    gs_notes
+    gs_literate-emacs-d
+    gs_dotfiles
+    gs_jwm_bin
     gs_jwm_pdata_notes
     gs_home_lab
-    gs_ebooks  # not on work mac
+    gs_ebooks
 }
 
 gs_all() {
