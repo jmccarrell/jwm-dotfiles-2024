@@ -1,19 +1,7 @@
 #!/usr/bin/env bash
 
-# Make vim the default editor.
-# export EDITOR='vim';
 # jwm: emacs forever
 export EDITOR=emacsclient;
-
-# Enable persistent REPL history for `node`.
-export NODE_REPL_HISTORY=~/.node_history;
-# Allow 32³ entries; the default is 1000.
-export NODE_REPL_HISTORY_SIZE='32768';
-# Use sloppy mode by default, matching web browsers.
-export NODE_REPL_MODE='sloppy';
-
-# Make Python use UTF-8 encoding for output to stdin, stdout, and stderr.
-export PYTHONIOENCODING='UTF-8';
 
 # Increase Bash history size. Allow 32³ entries; the default is 500.
 export HISTSIZE='32768';
@@ -24,40 +12,3 @@ export HISTCONTROL='ignoreboth';
 # Prefer US English and use UTF-8.
 export LANG='en_US.UTF-8';
 export LC_ALL='en_US.UTF-8';
-
-# Highlight section titles in manual pages.
-export LESS_TERMCAP_md="${yellow}";
-
-# Don’t clear the screen after quitting a manual page.
-export MANPAGER='less -X';
-
-# jwm
-#  from brew install coreutils
-if which brew > /dev/null 2>&1; then
-    export MANPATH=$(brew --prefix coreutils)/libexec/gnuman:$MANPATH
-fi
-
-# jwm: setup for virtualenvwrapper when I need python2 work and I have installed into the base python
-# if pip install virtualenvwrapper 2>&1 | grep -E 'already satisfied.*virtualenvwrapper' 2>&1 > /dev/null; then
-#     export WORKON_HOME=$HOME/tmp/venvs-python2
-#     if [ -d /w/be ]; then
-#         export PROJECT_HOME=/w/be
-#     fi
-#     source /usr/local/bin/virtualenvwrapper.sh
-# fi
-
-# circa Spring 2020, I prefer pipenv to manage virtualenv.
-#  so prefer pipenv's location for virtualenvs over virtualenv-wrapper's location
-#  ie, prefer
-#   $HOME/.local/share/virtualenvs
-#   over
-#   ~/.virtualenvs/
-#
-# pipenv itself does not need this, but emacs/elpy use it
-export WORKON_HOME=$HOME/.local/share/virtualenvs
-
-# set up go path
-declare -a go_paths=( $(jwm_go_paths) )
-if (( ${#go_paths[@]} > 0 )); then
-    export GOPATH=$(join_by : ${go_paths[@]})
-fi
