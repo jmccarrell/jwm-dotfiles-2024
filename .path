@@ -9,7 +9,7 @@ function jwm_home_paths() {
                         $HOME/.rbenv/bin
                        )
 
-    printf "%s\n" "${jwm_paths[@]}"
+    printf "%s\n" ${jwm_paths[@]}
 }
 
 
@@ -17,7 +17,7 @@ function jwm_home_paths() {
 function jwm_go_locations() {
     declare -a go_locations=( ${HOME}/go )
 
-    printf "%s\n" "${go_locations[@]}"
+    printf "%s\n" ${go_locations[@]}
 }
 
 # return every go project as a list of of lines
@@ -31,7 +31,7 @@ function jwm_go_paths() {
             fi
         done
     fi
-    printf "%s\n" "${go_paths[@]}"
+    printf "%s\n" ${go_paths[@]}
 }
 
 # return the bin directory for every go project as a list of lines
@@ -44,7 +44,7 @@ function jwm_go_bin_paths() {
         fi
     done
 
-    printf "%s\n" "${go_bin_paths[@]}"
+    printf "%s\n" ${go_bin_paths[@]}
 }
 
 function jwm_standard_paths() {
@@ -53,12 +53,12 @@ function jwm_standard_paths() {
         /bin/cat < $paths_fname
     else
         standard_paths=("/usr/local/bin" "/usr/bin" "/bin")
-        printf "%s\n" "${standard_paths[@]}"
+        printf "%s\n" ${standard_paths[@]}
     fi
 }
 
 function jwm_opt_homebrew_path() {
-    printf "/opt/homebrew/bin\n"
+    printf "%s\n" /opt/homebrew/bin
 }
 
 function jwm_gcloud_sdk_path() {
@@ -66,33 +66,22 @@ function jwm_gcloud_sdk_path() {
     gcloud_sdk_bin="${HOME}/google-cloud-sdk/bin"
     result=''
     if [ -e "$gcloud_sdk_bin" ]; then
-        result="$gcloud_sdk_bin"
+        printf "%s\n" $gcloud_sdk_bin
+        return
     fi
-    printf "$result"
+    printf '\n'
 }
 
 function jwm_set_path() {
     # create a standard simple path
     local -a std_paths=()
     while IFS= read -r dir; do
-        std_paths+=($dir)
-    done < <( jwm_standard_paths )
+        if [ -e ${dir} ] && [ -r ${dir} ]; then
+            std_paths+=($dir)
+        fi
+    done < <( jwm_standard_paths; jwm_opt_homebrew_path )
 
-    # IDK how to write 2 commands in the <( ) syntax, so just repeat the loop
-    while IFS= read -r dir; do
-        std_paths+=($dir)
-    done < <( jwm_opt_homebrew_path )
-    # declare -p std_paths
-
-    # recall [@]:0:1 expands the array; then extracts the zero-th element of length 1
-    # ie, this is a zsh/bash portable way to write ${array[0]}
-    local std_path=${std_paths[@]:0:1}
-    # declare -p std_path
-    for dir in ${std_paths[@]:1}; do
-        std_path+=":${dir}"
-    done
-    # declare -p std_path
-    PATH=$std_path
+    PATH=$(join_by : ${std_paths[@]})
 
     # then let brew, etc. do their thing
     # let brew do its thing
