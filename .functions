@@ -152,6 +152,7 @@ function jwm_prefer_java_11 {
 #
 # sync Jeffs repos to ease multi machine editing.
 #  shamelessly derived from http://doc.norang.ca/org-mode.html#git-sync
+#
 
 # Log a message for a repository
 git_sync_log_msg() {
@@ -291,20 +292,7 @@ gs_literate-emacs-d() {
     git_sync $(jwm_dir)/proj/literate-emacs.d origin
 }
 
-gs_gcloud_training_2020() {
-    git_sync $(jwm_dir)/proj/gcloud-training-2020 origin
-}
-
-gs_sql_for_data_analytics() {
-    git_sync $(jwm_dir)/proj/sql-for-data-analytics origin
-}
-
-gs_course_java_oo_specialization() {
-    git_sync $(jwm_dir)/proj/course-oo-java-specialization origin
-}
-
-
-gs_jwm() {
+gs_all() {
     gs_todo
     gs_notes
     gs_literate-emacs-d
@@ -313,10 +301,6 @@ gs_jwm() {
     gs_jwm_pdata_notes
     gs_home_lab
     gs_ebooks
-}
-
-gs_all() {
-    gs_jwm
 }
 
 #
