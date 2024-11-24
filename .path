@@ -4,10 +4,7 @@
 # declare jeffs home paths
 function jwm_home_paths() {
     local -a jwm_paths=($HOME/bin
-                        $HOME/.local/bin
-                        $HOME/.rbenv/shims
-                        $HOME/.rbenv/bin
-                       )
+                        $HOME/.local/bin)
 
     printf "%s\n" ${jwm_paths[@]}
 }
@@ -65,7 +62,7 @@ function jwm_gcloud_sdk_path() {
     # gcloud_sdk_bin='/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/bin'
     gcloud_sdk_bin="${HOME}/google-cloud-sdk/bin"
     result=''
-    if [ -e "$gcloud_sdk_bin" ]; then
+    if [[ -e "$gcloud_sdk_bin" ]]; then
         printf "%s\n" $gcloud_sdk_bin
         return
     fi
@@ -76,7 +73,7 @@ function jwm_set_path() {
     # create a standard simple path
     local -a std_paths=()
     while IFS= read -r dir; do
-        if [ -e ${dir} ] && [ -r ${dir} ]; then
+        if [[ -e ${dir} ]] && [[ -r ${dir} ]]; then
             std_paths+=($dir)
         fi
     done < <( jwm_standard_paths; jwm_opt_homebrew_path )
@@ -97,32 +94,22 @@ function jwm_set_path() {
     # then prepend my preferred paths
     # first, remove any duplicate path elements
     local -A dedup
-    local -a result=()
+    local -a jwm_paths=()
 
     for dir in \
         $(jwm_home_paths) \
         $(jwm_go_bin_paths) \
         $(jwm_gcloud_sdk_path) \
         ; do
-        if [ ${dedup[$dir]+_} ]; then
+        if [[ ${dedup[$dir]+_} ]]; then
             continue
         fi
         dedup[${dir}]=1
 
         if [[ -e $dir ]]; then
-            result+=($dir)
+            jwm_paths+=($dir)
         fi
     done
 
-    # now prepend our paths in reverse order
-    # apparently, the only posixly correct (both zsh and bash) is to:
-    # set, and then expand the positional parameters.
-    # cf: https://unix.stackexchange.com/a/27400/138583
-    set -- ${result[@]}
-    i=$#
-    while [ $i -gt 0 ]; do
-        eval "dir=\${$i}"
-        PATH="${dir}:${PATH}"
-        i=$((i-1))
-    done
+    PATH=$(join_by : $(join_by : ${jwm_paths[@]}) ${PATH})
 }
