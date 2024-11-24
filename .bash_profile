@@ -34,3 +34,5 @@ fi
 # set up direnv
 # cf: https://direnv.net/docs/hook.html
 command -v direnv &> /dev/null && eval "$(direnv hook bash)"
+
+test -e "${HOME}/.iterm2_shell_integration.bash" && source "${HOME}/.iterm2_shell_integration.bash" || true
