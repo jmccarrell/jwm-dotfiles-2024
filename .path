@@ -110,5 +110,5 @@ function jwm_set_path() {
         fi
     done
 
-    PATH=$(join_by : $(join_by : "${jwm_paths[@]}") "${PATH}")
+    PATH=$(join_by : "$(join_by : "${jwm_paths[@]}")" "${PATH}")
 }
