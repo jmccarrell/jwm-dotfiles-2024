@@ -2,7 +2,7 @@
 
 # Create a new directory and enter it
 function mkd() {
-    mkdir -p "$@" && cd "$_";
+    mkdir -p "$@" && cd "$_" || exit 23;
 }
 
 # Determine size of a file or total size of a directory
@@ -19,26 +19,26 @@ function fs() {
     fi;
 }
 
-# Use Git’s colored diff when available
-hash git &>/dev/null;
-if [ $? -eq 0 ]; then
+if command -v git 1>/dev/null 2>&1; then
     function diff() {
         git diff --no-index --color-words "$@";
     }
 fi;
 
+
 # Compare original and gzipped file size
 function gz() {
-    local origsize=$(wc -c < "$1");
-    local gzipsize=$(gzip -c "$1" | wc -c);
-    local ratio=$(echo "$gzipsize * 100 / $origsize" | bc -l);
+    local origsize='' gzipsize='' ratio=''
+    origsize=$(wc -c < "$1");
+    gzipsize=$(gzip -c "$1" | wc -c);
+    ratio=$(echo "$gzipsize * 100 / $origsize" | bc -l);
     printf "orig: %d bytes\n" "$origsize";
     printf "gzip: %d bytes (%2.2f%%)\n" "$gzipsize" "$ratio";
 }
 
 # UTF-8-encode a string of Unicode symbols
 function escape() {
-    printf "\\\x%s" $(printf "$@" | xxd -p -c1 -u);
+    printf "\\\x%s" "$(printf "%s" "$@" | xxd -p -c1 -u);"
     # print a newline unless we’re piping the output to another program
     if [ -t 1 ]; then
         echo ""; # newline
@@ -47,6 +47,8 @@ function escape() {
 
 # Decode \x{ABCD}-style Unicode escape sequences
 function unidecode() {
+    # don't apply shellcheck to perl code
+    # shellcheck disable=SC2145
     perl -e "binmode(STDOUT, ':utf8'); print \"$@\"";
     # print a newline unless we’re piping the output to another program
     if [ -t 1 ]; then
@@ -56,6 +58,8 @@ function unidecode() {
 
 # Get a character’s Unicode code point
 function codepoint() {
+    # don't apply shellcheck to perl code
+    # shellcheck disable=SC2145
     perl -e "use utf8; print sprintf('U+%04X', ord(\"$@\"))";
     # print a newline unless we’re piping the output to another program
     if [ -t 1 ]; then
@@ -75,12 +79,14 @@ function getcertnames() {
     echo "Testing ${domain}…";
     echo ""; # newline
 
-    local tmp=$(echo -e "GET / HTTP/1.0\nEOT" \
-                    | openssl s_client -connect "${domain}:443" -servername "${domain}" 2>&1);
+    local tmp=''
+    tmp=$(echo -e "GET / HTTP/1.0\nEOT" \
+              | openssl s_client -connect "${domain}:443" -servername "${domain}" 2>&1);
 
     if [[ "${tmp}" = *"-----BEGIN CERTIFICATE-----"* ]]; then
-        local certText=$(echo "${tmp}" \
-                             | openssl x509 -text -certopt "no_aux, no_header, no_issuer, no_pubkey, \
+        local certText=''
+        certText=$(echo "${tmp}" \
+                       | openssl x509 -text -certopt "no_aux, no_header, no_issuer, no_pubkey, \
                         no_serial, no_sigdump, no_signame, no_validity, no_version");
         echo "Common Name:";
         echo ""; # newline
