@@ -42,9 +42,12 @@ if command -v brew &> /dev/null; then
     fi;
 fi;
 
-if command -v starship &> /dev/null; then
-    eval "$(starship init bash)"
-fi
+# Set up fzf key bindings and fuzzy completion
+command -v fzf &> /dev/null && eval "$(fzf --bash)"
+
+command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
+
+command -v starship &> /dev/null && eval "$(starship init bash)"
 
 # set up direnv
 # cf: https://direnv.net/docs/hook.html
