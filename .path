@@ -9,6 +9,12 @@ function jwm_home_paths() {
     printf "%s\n" "${jwm_paths[@]}"
 }
 
+# the path where the determinate nix installer puts nix on my macos box
+function nix_path() {
+    local -a nix_paths=(/nix/var/nix/profiles/default/bin)
+
+    printf "%s\n" "${nix_paths[@]}"
+}
 
 # define GOPATH, and set PATH from GOPATH as needed.
 function jwm_go_locations() {
@@ -96,6 +102,7 @@ function jwm_set_path() {
     local -a jwm_paths=()
 
     for dir in \
+        $(nix_path) \
         $(jwm_home_paths) \
         $(jwm_go_bin_paths) \
         $(jwm_gcloud_sdk_path) \
