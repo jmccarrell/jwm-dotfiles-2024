@@ -103,4 +103,11 @@ alias path='echo -e ${PATH//:/\\n}'
 alias p=pushd
 alias P=popd
 
+# k8s aliases
+if command -v kubectl > /dev/null; then
+   alias k=kubectl;
+   alias kx='f() { [ "$1" ] && kubectl config use-context $1 || kubectl config current-context ; } ; f'
+
+fi
+
 # jwm-end
