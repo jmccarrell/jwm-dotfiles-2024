@@ -167,3 +167,10 @@
 
 [init]
 	defaultBranch = main
+
+# persona uses lfs; their onboarding script added this lfs section.
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
