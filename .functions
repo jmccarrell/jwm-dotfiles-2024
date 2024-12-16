@@ -127,11 +127,11 @@ function tre() {
 
 # is this a persona laptop we are running on?
 function persona_host_p {
-    dir=$HOME/Jts
+    dir=$HOME/code/persona-web
     if [[ -e $dir && -d $dir ]]; then
-        return 1;
+        return 0;
     fi;
-    return 0;
+    return 1;
 }
 
 # join an array into a string
