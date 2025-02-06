@@ -58,5 +58,6 @@ test -e "${HOME}/.iterm2_shell_integration.bash" && \
 
 # persona runs asdf to manage nodejs, ruby and gems.
 if command -v asdf > /dev/null; then
-    source /opt/homebrew/opt/asdf/libexec/asdf.sh
+    export ASDF_DATA_DIR=/Users/jeff/.asdf
+    export PATH="$ASDF_DATA_DIR/shims:$PATH"
 fi
