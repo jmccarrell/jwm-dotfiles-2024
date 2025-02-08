@@ -42,6 +42,18 @@ if command -v brew &> /dev/null; then
     fi;
 fi;
 
+# ensure kitty terminal is in my path on OS X
+if [ -e '/Applications/kitty.app/Contents/MacOS/kitty' ]; then
+    if [ ! -d ~/.local/bin ]; then
+        mkdir ~/.local/bin
+    fi
+    for f in kitty kitten; do
+        if [ ! -e ~/.local/bin/$f ]; then
+            ln -s /Applications/kitty.app/Contents/MacOS/$f ~/.local/bin
+        fi
+    done
+fi
+
 # Set up fzf key bindings and fuzzy completion
 command -v fzf &> /dev/null && eval "$(fzf --bash)"
 
