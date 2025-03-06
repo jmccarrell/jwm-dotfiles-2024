@@ -300,11 +300,16 @@ gs_literate-emacs-d() {
     git_sync "$(jwm_dir)/proj/literate-emacs.d" origin
 }
 
+gs_persona_notes() {
+    git_sync "${HOME}/persona/notes" origin
+}
+
 gs_all() {
     gs_todo
     gs_notes
     gs_literate-emacs-d
     gs_dotfiles
+    gs_persona_notes
     gs_jwm_bin
     gs_jwm_pdata_notes
     gs_home_lab
