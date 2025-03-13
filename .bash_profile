@@ -57,10 +57,6 @@ fi
 # Set up fzf key bindings and fuzzy completion
 command -v fzf &> /dev/null && eval "$(fzf --bash)"
 
-command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
-
-command -v starship &> /dev/null && eval "$(starship init bash)"
-
 # set up direnv
 # cf: https://direnv.net/docs/hook.html
 command -v direnv &> /dev/null && eval "$(direnv hook bash)"
@@ -73,3 +69,6 @@ if command -v asdf > /dev/null; then
     export ASDF_DATA_DIR=/Users/jeff/.asdf
     export PATH="$ASDF_DATA_DIR/shims:$PATH"
 fi
+
+command -v starship &> /dev/null && eval "$(starship init bash)"
+command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
