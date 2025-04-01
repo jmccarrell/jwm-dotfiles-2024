@@ -64,6 +64,9 @@ command -v direnv &> /dev/null && eval "$(direnv hook bash)"
 test -e "${HOME}/.iterm2_shell_integration.bash" && \
     ( source "${HOME}/.iterm2_shell_integration.bash" || true )
 
+# add rust/cargo to path
+[[ -e ${HOME}/.cargo/env ]] && source ${HOME}/.cargo/env
+
 # persona runs asdf to manage nodejs, ruby and gems.
 if command -v asdf > /dev/null; then
     export ASDF_DATA_DIR=/Users/jeff/.asdf
