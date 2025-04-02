@@ -67,6 +67,9 @@ test -e "${HOME}/.iterm2_shell_integration.bash" && \
 # add rust/cargo to path
 [[ -e ${HOME}/.cargo/env ]] && source ${HOME}/.cargo/env
 
+# set up packer to autocomplete
+command -v packer &> /dev/null && complete -C packer packer
+
 # persona runs asdf to manage nodejs, ruby and gems.
 if command -v asdf > /dev/null; then
     export ASDF_DATA_DIR=/Users/jeff/.asdf
