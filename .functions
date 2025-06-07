@@ -262,6 +262,14 @@ git_sync() {
     git_check_refs "$git_path" "$remote" || return 1
 }
 
+# show history of recently checked out branches
+gitbranches() {
+    git reflog --date=relative | grep checkout \
+        | sed -n -e 's/^.*{\(.*\)}.*to /\1|/p' \
+        | perl -ane '$H{$F[2]}++ or print' | column -t -s'|' | head -n15
+}
+
+
 jwm_dir() {
     printf "%s\n" "${HOME}/jwm"
 }
