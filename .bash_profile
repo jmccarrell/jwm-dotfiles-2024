@@ -67,6 +67,9 @@ test -e "${HOME}/.iterm2_shell_integration.bash" && \
 # add rust/cargo to path
 [[ -e ${HOME}/.cargo/env ]] && source ${HOME}/.cargo/env
 
+# setup aws cli to autocomplete
+command -v aws &> /dev/null && complete -C aws_completer aws
+
 # set up packer to autocomplete
 command -v packer &> /dev/null && complete -C packer packer
 
