@@ -88,3 +88,11 @@ command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
 # Added by OrbStack: command-line tools and integration
 # This won't be added again if you remove it.
 source ~/.orbstack/shell/init.bash 2>/dev/null || :
+
+# Mark43 stuff
+
+# We have to add the zscaler cert so node, and thus claude work
+zscaler_cert="${HOME}/ca-cert/ZscalerRootCertificate-2048-SHA256.crt"
+if [ -e "${zscaler_cert}" ]; then
+    export NODE_EXTRA_CA_CERTS=${zscaler_cert}
+fi
