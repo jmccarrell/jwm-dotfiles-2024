@@ -113,8 +113,4 @@ if command -v kubectl > /dev/null; then
    alias kx='f() { [ "$1" ] && kubectl config use-context $1 || kubectl config current-context ; } ; f';
 fi
 
-if persona_host_p; then
-    alias gcauth='gcloud auth application-default login && gcloud auth login --update-adc'
-fi
-
 # jwm-end

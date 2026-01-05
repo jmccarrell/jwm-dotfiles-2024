@@ -76,9 +76,8 @@ command -v packer &> /dev/null && complete -C packer packer
 # tofu autocomplete
 command -v tofu &> /dev/null && complete -C /opt/homebrew/bin/tofu tofu
 
-# persona runs asdf to manage nodejs, ruby and gems.
 if command -v asdf > /dev/null; then
-    export ASDF_DATA_DIR=/Users/jeff/.asdf
+    export ASDF_DATA_DIR=${HOME}/.asdf
     export PATH="$ASDF_DATA_DIR/shims:$PATH"
 fi
 

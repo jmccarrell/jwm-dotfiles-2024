@@ -125,9 +125,9 @@ function tre() {
 # jeffs functions
 #
 
-# is this a persona laptop we are running on?
-function persona_host_p {
-    dir=$HOME/code/persona-web
+# if this a Mark43 laptop?
+function mark43_host_p {
+    dir=$HOME/code/dev43
     if [[ -e $dir && -d $dir ]]; then
         return 0;
     fi;
@@ -308,8 +308,8 @@ gs_literate-emacs-d() {
     git_sync "$(jwm_dir)/proj/literate-emacs.d" origin
 }
 
-gs_persona_notes() {
-    git_sync "${HOME}/persona/notes" origin
+gs_mark43_notes() {
+    git_sync "${HOME}/mark43/notes" origin
 }
 
 gs_all() {
@@ -317,7 +317,7 @@ gs_all() {
     gs_notes
     gs_literate-emacs-d
     gs_dotfiles
-    gs_persona_notes
+    gs_mark43_notes
     gs_jwm_bin
     gs_jwm_pdata_notes
     gs_home_lab
