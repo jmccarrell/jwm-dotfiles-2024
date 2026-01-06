@@ -113,4 +113,11 @@ if command -v kubectl > /dev/null; then
    alias kx='f() { [ "$1" ] && kubectl config use-context $1 || kubectl config current-context ; } ; f';
 fi
 
+if command -v kubectl-argo-rollouts > /dev/null; then
+    # jwm: well this doesn't provide the completions I expect
+    # but move on for now...
+    source <(kubectl-argo-rollouts completion bash)
+    alias kr='kubectl-argo-rollouts'
+    complete -F __start_kubectl-argo-rollouts kr
+fi
 # jwm-end
