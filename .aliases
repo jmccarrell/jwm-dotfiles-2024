@@ -117,7 +117,7 @@ if command -v kubectl-argo-rollouts > /dev/null; then
     # jwm: well this doesn't provide the completions I expect
     # but move on for now...
     source <(kubectl-argo-rollouts completion bash)
-    alias kr='kubectl-argo-rollouts'
-    complete -F __start_kubectl-argo-rollouts kr
+    alias kar='kubectl-argo-rollouts'
+    complete -F __start_kubectl-argo-rollouts kar
 fi
 # jwm-end
