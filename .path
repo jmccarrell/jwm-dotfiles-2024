@@ -74,6 +74,11 @@ function jwm_gcloud_sdk_path() {
     printf '\n'
 }
 
+function mark43_paths() {
+    declare -a mark43_paths=( $HOME/code/mark43/dev-tools/vault )
+    printf "%s\n" "${mark43_paths[@]}"
+}
+
 function jwm_set_path() {
     # create a standard simple path
     local -a std_paths=()
@@ -104,6 +109,7 @@ function jwm_set_path() {
     for dir in \
         $(nix_path) \
         $(jwm_home_paths) \
+        $(mark43_paths) \
         $(jwm_go_bin_paths) \
         $(jwm_gcloud_sdk_path) \
         ; do

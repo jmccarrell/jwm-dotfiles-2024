@@ -89,9 +89,16 @@ command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
 source ~/.orbstack/shell/init.bash 2>/dev/null || :
 
 # Mark43 stuff
+# there is mark43 path stuff in .path as well
 
 # We have to add the zscaler cert so node, and thus claude work
 zscaler_cert="${HOME}/ca-cert/ZscalerRootCertificate-2048-SHA256.crt"
 if [ -e "${zscaler_cert}" ]; then
     export NODE_EXTRA_CA_CERTS=${zscaler_cert}
+fi
+
+# load up the vault config
+vault_rc=${HOME}/.vaultrc
+if [ -e ${vault_rc} ]; then
+    source ${vault_rc}
 fi
