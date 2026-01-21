@@ -102,3 +102,5 @@ vault_rc=${HOME}/.vaultrc
 if [ -e ${vault_rc} ]; then
     source ${vault_rc}
 fi
+# export my GH personal access token per: https://readme.mark43.io/guides/vault/
+export GITHUB_TOKEN="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"
