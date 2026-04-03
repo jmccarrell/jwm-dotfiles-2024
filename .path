@@ -64,6 +64,92 @@ function jwm_opt_homebrew_path() {
     printf "%s\n" /opt/homebrew/bin
 }
 
+function jwm_brew_cmd() {
+    local brew_cmd=''
+    local candidate=''
+
+    for candidate in /opt/workbrew/bin/brew "$(command -v brew 2>/dev/null)" /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [[ -n "$candidate" && -x "$candidate" ]]; then
+            brew_cmd="$candidate"
+            break
+        fi
+    done
+
+    if [[ -n "$brew_cmd" ]]; then
+        printf "%s\n" "$brew_cmd"
+        return 0
+    fi
+
+    return 1
+}
+
+function jwm_pyenv_register_homebrew_python_prefix() {
+    local pyenv_root="$1"
+    local prefix="$2"
+    local marker='.jwm-homebrew-python'
+    local pybin=''
+    local short_version=''
+    local patch_version=''
+    local version_name=''
+    local version_dir=''
+    local bindir=''
+    local exe=''
+
+    pybin="$prefix/bin/python3"
+    if [[ ! -x "$pybin" ]]; then
+        return 0
+    fi
+
+    short_version=$("$pybin" -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")' 2>/dev/null) || return 0
+    patch_version=$("$pybin" -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}")' 2>/dev/null) || return 0
+
+    for version_name in "$short_version" "$patch_version"; do
+        version_dir="$pyenv_root/versions/$version_name"
+        if [[ -e "$version_dir" && ! -f "$version_dir/$marker" ]]; then
+            continue
+        fi
+
+        mkdir -p "$version_dir/bin" || continue
+        printf "%s\n" "$prefix" > "$version_dir/$marker"
+
+        for bindir in "$prefix/bin" "$prefix/libexec/bin"; do
+            if [[ ! -d "$bindir" ]]; then
+                continue
+            fi
+            for exe in "$bindir"/*; do
+                if [[ -e "$exe" ]]; then
+                    ln -sfn "$exe" "$version_dir/bin/$(basename "$exe")"
+                fi
+            done
+        done
+    done
+}
+
+function jwm_pyenv_link_homebrew_pythons() {
+    local brew_cmd=''
+    local brew_prefix=''
+    local pyenv_root="${PYENV_ROOT:-$HOME/.pyenv}"
+    local prefix=''
+    local nullglob_was_set=0
+
+    if ! command -v pyenv > /dev/null 2>&1; then
+        return 0
+    fi
+
+    brew_cmd=$(jwm_brew_cmd 2>/dev/null) || return 0
+    brew_prefix=$("$brew_cmd" --prefix 2>/dev/null) || return 0
+    mkdir -p "$pyenv_root/versions" || return 0
+
+    shopt -q nullglob && nullglob_was_set=1
+    shopt -s nullglob
+    for prefix in "$brew_prefix"/opt/python "$brew_prefix"/opt/python@*; do
+        jwm_pyenv_register_homebrew_python_prefix "$pyenv_root" "$prefix"
+    done
+    if (( ! nullglob_was_set )); then
+        shopt -u nullglob
+    fi
+}
+
 function jwm_gcloud_sdk_path() {
     # gcloud_sdk_bin='/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/bin'
     gcloud_sdk_bin="${HOME}/google-cloud-sdk/bin"
@@ -91,10 +177,14 @@ function jwm_set_path() {
     PATH=$(join_by : "${std_paths[@]}")
 
     # then let brew, etc. do their thing
-    # let brew do its thing
-    if command -v brew 1>/dev/null 2>&1; then eval "$(brew shellenv)"; fi
+    local brew_cmd=''
+    brew_cmd=$(jwm_brew_cmd 2>/dev/null)
+    if [[ -n "$brew_cmd" ]]; then eval "$("$brew_cmd" shellenv)"; fi
 
-    # let pyenv do its thing last
+    # make Homebrew-managed Python versions visible to pyenv
+    jwm_pyenv_link_homebrew_pythons
+
+    # let pyenv do its thing
     if command -v pyenv > /dev/null; then eval "$(pyenv init -)"; fi
     if command -v pyenv-virtualenv-init > /dev/null; then eval "$(pyenv virtualenv-init -)"; fi
 

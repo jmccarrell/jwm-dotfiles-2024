@@ -30,9 +30,10 @@ done;
 # Add tab completion for many Bash commands
 # based on prior installation of bash-completion (not bash-completion@2)
 # brew install bash-completion
-if command -v brew &> /dev/null; then
+brew_cmd=''
+if brew_cmd=$(jwm_brew_cmd 2>/dev/null); then
     bp=''
-    bp=$(brew --prefix)
+    bp=$("$brew_cmd" --prefix 2>/dev/null)
     if [ -r "${bp}/etc/profile.d/bash_completion.sh" ]; then
         # Ensure existing Homebrew v1 completions continue to work
         export BASH_COMPLETION_COMPAT_DIR="${bp}/etc/bash_completion.d";
