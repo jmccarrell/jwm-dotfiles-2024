@@ -1,6 +1,13 @@
 [user]
 	name = Jeff McCarrell
-	email = jeff@mccarrell.org
+
+[include]
+	# Untracked, machine-local default identity.
+	path = ~/.gitconfig.machine
+
+[includeIf "gitdir:~/jwm/"]
+	# Personal repos override the machine default.
+	path = ~/.gitconfig.personal
 
 [alias]
 
