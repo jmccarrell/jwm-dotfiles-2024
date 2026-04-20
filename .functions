@@ -262,6 +262,115 @@ git_sync() {
     git_check_refs "$git_path" "$remote" || return 1
 }
 
+# Convert a regular git repo to a bare repo with worktree layout.
+# Usage: git_to_bare_worktree <repo-path> [remote-url]
+#
+# Result:
+#   <repo>/
+#     .bare/   bare git repo
+#     .git     file pointing to .bare
+#     main/    worktree checked out to main branch
+git_to_bare_worktree() {
+    local repo_path remote_url repo_name parent_dir old_path new_path default_branch response
+
+    if [[ -z "${1:-}" ]]; then
+        printf "Usage: git_to_bare_worktree <repo-path> [remote-url]\n"
+        return 1
+    fi
+
+    # resolve to absolute path
+    repo_path=$(cd "$1" 2>/dev/null && pwd) || {
+        printf "ERROR: Cannot resolve path: %s\n" "$1"
+        return 1
+    }
+
+    if ! git -C "$repo_path" rev-parse --git-dir >/dev/null 2>&1; then
+        printf "ERROR: Not a git repository: %s\n" "$repo_path"
+        return 1
+    fi
+
+    # resolve remote URL
+    if [[ -n "${2:-}" ]]; then
+        remote_url="$2"
+    else
+        remote_url=$(git -C "$repo_path" remote get-url origin 2>/dev/null) || {
+            printf "ERROR: No 'origin' remote found; pass remote URL as second argument\n"
+            return 1
+        }
+    fi
+
+    repo_name=$(basename "$repo_path")
+    parent_dir=$(dirname "$repo_path")
+    old_path="${parent_dir}/${repo_name}.old"
+    new_path="${parent_dir}/${repo_name}"
+
+    if [[ -e "$old_path" ]]; then
+        printf "ERROR: Backup path already exists: %s\n" "$old_path"
+        return 1
+    fi
+
+    # inner restore helper
+    _git_tbw_restore() {
+        rm -rf "$new_path" 2>/dev/null
+        mv "$old_path" "$new_path"
+        printf "  Restored original repository at %s\n" "$new_path"
+    }
+
+    printf "Moving %s to %s\n" "$repo_path" "$old_path"
+    mv "$repo_path" "$old_path" || {
+        printf "ERROR: Failed to move repository aside\n"
+        return 1
+    }
+
+    mkdir -p "$new_path" || {
+        printf "ERROR: Failed to create %s\n" "$new_path"
+        _git_tbw_restore
+        return 1
+    }
+
+    printf "Cloning bare repo from %s\n" "$remote_url"
+    if ! git clone --bare "$remote_url" "${new_path}/.bare"; then
+        printf "ERROR: Bare clone failed\n"
+        _git_tbw_restore
+        return 1
+    fi
+
+    # enforce main as default branch
+    default_branch=$(git -C "${new_path}/.bare" symbolic-ref HEAD 2>/dev/null)
+    default_branch=${default_branch#refs/heads/}
+    if [[ "$default_branch" != "main" ]]; then
+        printf "ERROR: Remote default branch is '%s', not 'main'\n" "$default_branch"
+        _git_tbw_restore
+        return 1
+    fi
+
+    echo "gitdir: ./.bare" > "${new_path}/.git" || {
+        printf "ERROR: Failed to create .git file\n"
+        _git_tbw_restore
+        return 1
+    }
+
+    printf "Adding worktree for 'main'\n"
+    if ! git -C "$new_path" worktree add main main; then
+        printf "ERROR: Failed to add main worktree\n"
+        _git_tbw_restore
+        return 1
+    fi
+
+    printf "\nDone. Verify %s/main looks correct.\n" "$new_path"
+    printf "Old repo saved at %s\n" "$old_path"
+
+    read -r -p "Remove old backup ${old_path}? [y/N] " response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        rm -rf "$old_path"
+        printf "Removed %s\n" "$old_path"
+    else
+        printf "Keeping %s\n" "$old_path"
+    fi
+
+    unset -f _git_tbw_restore
+}
+
 # show history of recently checked out branches
 gitbranches() {
     git reflog --date=relative | grep checkout \
