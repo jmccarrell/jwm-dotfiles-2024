@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# test change.
-
 # Create a new directory and enter it
 function mkd() {
     mkdir -p "$@" && cd "$_" || exit 23;
