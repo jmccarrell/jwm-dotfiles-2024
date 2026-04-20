@@ -269,9 +269,204 @@ git_sync() {
 #   <repo>/
 #     .bare/   bare git repo
 #     .git     file pointing to .bare
-#     main/    worktree checked out to main branch
+#     <branch>/ worktree checked out to remote default branch
+git_tbw_path_exists() {
+    [[ -e "$1" || -L "$1" ]]
+}
+
+git_tbw_git_path_exists() {
+    local repo_path="$1"
+    local git_path_name="$2"
+    local git_path
+
+    git_path=$(git -C "$repo_path" rev-parse --git-path "$git_path_name" 2>/dev/null) || return 1
+    [[ -e "$git_path" ]]
+}
+
+git_tbw_report_unsafe_repo_state_items() {
+    local repo_path="$1"
+    local remote_name="$2"
+    local remote_url="$3"
+    local current_branch target_branch line
+    local -a tracked_unstaged tracked_staged
+
+    tracked_unstaged=()
+    tracked_staged=()
+
+    current_branch=$(git -C "$repo_path" symbolic-ref --quiet --short HEAD 2>/dev/null) || current_branch=""
+
+    if [[ -z "$current_branch" ]]; then
+        printf "  - detached HEAD: check out the branch you want to preserve before converting.\n"
+    fi
+
+    target_branch=$(git -C "$repo_path" symbolic-ref --quiet --short "refs/remotes/${remote_name}/HEAD" 2>/dev/null) || target_branch=""
+    target_branch=${target_branch#${remote_name}/}
+
+    if [[ -z "$target_branch" ]]; then
+        printf "  - cannot resolve %s default branch from local refs.\n" "$remote_name"
+        printf "    Run: git -C %s remote set-head %s --auto\n" "$repo_path" "$remote_name"
+    fi
+
+    if [[ -n "$target_branch" && -n "$current_branch" && "$current_branch" != "$target_branch" ]]; then
+        printf "  - checked out branch is '%s', but %s default branch is '%s'.\n" "$current_branch" "$remote_name" "$target_branch"
+        printf "    Switch to '%s' and make sure it is fully pushed before converting.\n" "$target_branch"
+    fi
+
+    if ! git -C "$repo_path" remote get-url "$remote_name" >/dev/null 2>&1; then
+        printf "  - missing remote '%s'; cannot prove this repo is restorable from %s.\n" "$remote_name" "$remote_url"
+    else
+        line=$(git -C "$repo_path" remote get-url "$remote_name" 2>/dev/null)
+        if [[ "$line" != "$remote_url" ]]; then
+            printf "  - remote '%s' URL does not match the requested clone source.\n" "$remote_name"
+            printf "    %s -> %s\n" "$remote_name" "$line"
+            printf "    requested -> %s\n" "$remote_url"
+        fi
+    fi
+
+    while IFS= read -r line
+    do
+        [[ -n "$line" ]] && tracked_unstaged+=("$line")
+    done < <(git -C "$repo_path" diff --name-only --)
+
+    if [[ ${#tracked_unstaged[@]} -gt 0 ]]; then
+        printf "  - tracked unstaged changes:\n"
+        for line in "${tracked_unstaged[@]}"
+        do
+            printf "    %s\n" "$line"
+        done
+    fi
+
+    while IFS= read -r line
+    do
+        [[ -n "$line" ]] && tracked_staged+=("$line")
+    done < <(git -C "$repo_path" diff --cached --name-only --)
+
+    if [[ ${#tracked_staged[@]} -gt 0 ]]; then
+        printf "  - staged but uncommitted changes:\n"
+        for line in "${tracked_staged[@]}"
+        do
+            printf "    %s\n" "$line"
+        done
+    fi
+
+    if git_tbw_git_path_exists "$repo_path" MERGE_HEAD; then
+        printf "  - merge in progress.\n"
+    fi
+
+    if git_tbw_git_path_exists "$repo_path" CHERRY_PICK_HEAD; then
+        printf "  - cherry-pick in progress.\n"
+    fi
+
+    if git_tbw_git_path_exists "$repo_path" REVERT_HEAD; then
+        printf "  - revert in progress.\n"
+    fi
+
+    if git_tbw_git_path_exists "$repo_path" REBASE_HEAD || git_tbw_git_path_exists "$repo_path" rebase-apply || git_tbw_git_path_exists "$repo_path" rebase-merge; then
+        printf "  - rebase in progress.\n"
+    fi
+
+    if git_tbw_git_path_exists "$repo_path" BISECT_LOG; then
+        printf "  - bisect in progress.\n"
+    fi
+
+    if [[ -n "$(git -C "$repo_path" stash list 2>/dev/null)" ]]; then
+        printf "  - stash entries exist.\n"
+        printf "    Export, apply, or drop them before converting.\n"
+    fi
+
+    if [[ -n "$target_branch" && -n "$current_branch" && "$current_branch" == "$target_branch" ]]; then
+        if ! git -C "$repo_path" show-ref --verify --quiet "refs/remotes/${remote_name}/${target_branch}"; then
+            printf "  - missing tracking ref refs/remotes/%s/%s.\n" "$remote_name" "$target_branch"
+            printf "    Run: git -C %s fetch %s %s\n" "$repo_path" "$remote_name" "$target_branch"
+        elif ! git -C "$repo_path" merge-base --is-ancestor HEAD "refs/remotes/${remote_name}/${target_branch}"; then
+            printf "  - local commits are not fully present on %s/%s.\n" "$remote_name" "$target_branch"
+            printf "    Push or otherwise preserve that history before converting.\n"
+        fi
+    fi
+}
+
+git_tbw_report_unsafe_repo_state() {
+    local repo_path="$1"
+    local remote_name="$2"
+    local remote_url="$3"
+    local target_branch report
+
+    target_branch=$(git -C "$repo_path" symbolic-ref --quiet --short "refs/remotes/${remote_name}/HEAD" 2>/dev/null) || target_branch=""
+    target_branch=${target_branch#${remote_name}/}
+    report=$(git_tbw_report_unsafe_repo_state_items "$repo_path" "$remote_name" "$remote_url")
+
+    if [[ -n "$report" ]]; then
+        printf "\nUnsafe to convert %s\n" "$repo_path" >&2
+        printf "The following git-managed state is not guaranteed recoverable from %s:\n" "$remote_url" >&2
+        printf "%s\n" "$report" >&2
+        printf "\nHow to proceed:\n" >&2
+        printf "  1. Commit and push any work you want to keep on %s/%s.\n" "$remote_name" "${target_branch:-<default-branch>}" >&2
+        printf "  2. Finish or abort any in-progress git operations.\n" >&2
+        printf "  3. Clear stash entries or export them somewhere outside this repo.\n" >&2
+        printf "  4. Re-run git_to_bare_worktree once only untracked/ignored paths remain.\n" >&2
+        return 1
+    fi
+
+    printf "%s\n" "$target_branch"
+}
+
+git_tbw_prompt_candidate_action() {
+    local candidate_path="$1"
+    local candidate_kind="$2"
+    local response
+
+    while true
+    do
+        read -r -p "  ${candidate_path} [${candidate_kind}] - [i]gnore/[c]opy? " response
+        case "$response" in
+            [Ii]|[Ii][Gg][Nn][Oo][Rr][Ee])
+                printf "ignore\n"
+                return 0
+                ;;
+            [Cc]|[Cc][Oo][Pp][Yy])
+                printf "copy\n"
+                return 0
+                ;;
+        esac
+        printf "    Please answer 'ignore' or 'copy'.\n" >&2
+    done
+}
+
+git_tbw_copy_preserved_path() {
+    local old_root="$1"
+    local new_root="$2"
+    local relative_path="$3"
+    local source_path target_path
+
+    source_path="${old_root}/${relative_path}"
+    target_path="${new_root}/${relative_path}"
+
+    if ! git_tbw_path_exists "$source_path"; then
+        printf "ERROR: Selected path no longer exists: %s\n" "$source_path"
+        return 1
+    fi
+
+    if git_tbw_path_exists "$target_path"; then
+        printf "ERROR: Refusing to overwrite restored path: %s\n" "$target_path"
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$target_path")" || {
+        printf "ERROR: Failed to create parent directory for %s\n" "$target_path"
+        return 1
+    }
+
+    cp -PR "$source_path" "$target_path" || {
+        printf "ERROR: Failed to copy %s to %s\n" "$source_path" "$target_path"
+        return 1
+    }
+}
+
 git_to_bare_worktree() {
-    local repo_path remote_url repo_name parent_dir old_path new_path default_branch response
+    local repo_path remote_url repo_name parent_dir old_path new_path worktree_path default_branch response path action target_branch
+    local remote_name
+    local i
+    local -a candidate_paths candidate_kinds copy_paths
 
     if [[ -z "${1:-}" ]]; then
         printf "Usage: git_to_bare_worktree <repo-path> [remote-url]\n"
@@ -289,24 +484,69 @@ git_to_bare_worktree() {
         return 1
     fi
 
+    remote_name="origin"
+
     # resolve remote URL
     if [[ -n "${2:-}" ]]; then
         remote_url="$2"
     else
-        remote_url=$(git -C "$repo_path" remote get-url origin 2>/dev/null) || {
+        remote_url=$(git -C "$repo_path" remote get-url "$remote_name" 2>/dev/null) || {
             printf "ERROR: No 'origin' remote found; pass remote URL as second argument\n"
             return 1
         }
     fi
 
+    target_branch=$(git_tbw_report_unsafe_repo_state "$repo_path" "$remote_name" "$remote_url") || return 1
+
     repo_name=$(basename "$repo_path")
     parent_dir=$(dirname "$repo_path")
     old_path="${parent_dir}/${repo_name}.old"
     new_path="${parent_dir}/${repo_name}"
+    worktree_path="${new_path}/${target_branch}"
+    candidate_paths=()
+    candidate_kinds=()
+    copy_paths=()
 
     if [[ -e "$old_path" ]]; then
         printf "ERROR: Backup path already exists: %s\n" "$old_path"
         return 1
+    fi
+
+    while IFS= read -r -d '' path
+    do
+        if git_tbw_path_exists "${repo_path}/${path}"; then
+            candidate_paths+=("$path")
+            candidate_kinds+=("ignored")
+        fi
+    done < <(git -C "$repo_path" ls-files --full-name -o -i --exclude-standard -z)
+
+    while IFS= read -r -d '' path
+    do
+        if git_tbw_path_exists "${repo_path}/${path}"; then
+            candidate_paths+=("$path")
+            candidate_kinds+=("untracked")
+        fi
+    done < <(git -C "$repo_path" ls-files --full-name -o --exclude-standard -z)
+
+    if [[ ${#candidate_paths[@]} -gt 0 ]]; then
+        printf "Local-only paths detected in %s:\n" "$repo_path"
+        for i in "${!candidate_paths[@]}"
+        do
+            printf "  %s [%s]\n" "${candidate_paths[$i]}" "${candidate_kinds[$i]}"
+        done
+        printf "Choose 'ignore' to leave a path only in %s, or 'copy' to restore it into %s after refresh.\n" "$old_path" "$worktree_path"
+
+        for i in "${!candidate_paths[@]}"
+        do
+            action=$(git_tbw_prompt_candidate_action "${candidate_paths[$i]}" "${candidate_kinds[$i]}") || {
+                printf "ERROR: Failed while collecting preservation choices\n"
+                return 1
+            }
+            if [[ "$action" == "copy" ]]; then
+                copy_paths+=("${candidate_paths[$i]}")
+            fi
+        done
+        printf "\n"
     fi
 
     # inner restore helper
@@ -335,10 +575,10 @@ git_to_bare_worktree() {
         return 1
     fi
 
-    # enforce main as default branch
+    # enforce main as default branch only on non-Mark43 hosts
     default_branch=$(git -C "${new_path}/.bare" symbolic-ref HEAD 2>/dev/null)
     default_branch=${default_branch#refs/heads/}
-    if [[ "$default_branch" != "main" ]]; then
+    if ! mark43_host_p && [[ "$default_branch" != "main" ]]; then
         printf "ERROR: Remote default branch is '%s', not 'main'\n" "$default_branch"
         _git_tbw_restore
         return 1
@@ -350,11 +590,23 @@ git_to_bare_worktree() {
         return 1
     }
 
-    printf "Adding worktree for 'main'\n"
-    if ! git -C "$new_path" worktree add main main; then
-        printf "ERROR: Failed to add main worktree\n"
+    printf "Adding worktree for '%s'\n" "$target_branch"
+    if ! git -C "$new_path" worktree add "$target_branch" "$target_branch"; then
+        printf "ERROR: Failed to add %s worktree\n" "$target_branch"
         _git_tbw_restore
         return 1
+    fi
+
+    if [[ ${#copy_paths[@]} -gt 0 ]]; then
+        printf "Restoring selected local-only paths into %s\n" "$worktree_path"
+        for path in "${copy_paths[@]}"
+        do
+            printf "  Copying %s\n" "$path"
+            if ! git_tbw_copy_preserved_path "$old_path" "$worktree_path" "$path"; then
+                _git_tbw_restore
+                return 1
+            fi
+        done
     fi
 
     printf "\nDone. Verify %s/main looks correct.\n" "$new_path"
