@@ -270,8 +270,66 @@ git_sync() {
 #     .bare/   bare git repo
 #     .git     file pointing to .bare
 #     main/    worktree checked out to main branch
+git_tbw_path_exists() {
+    [[ -e "$1" || -L "$1" ]]
+}
+
+git_tbw_prompt_candidate_action() {
+    local candidate_path="$1"
+    local candidate_kind="$2"
+    local response
+
+    while true
+    do
+        read -r -p "  ${candidate_path} [${candidate_kind}] - [i]gnore/[c]opy? " response
+        case "$response" in
+            [Ii]|[Ii][Gg][Nn][Oo][Rr][Ee])
+                printf "ignore\n"
+                return 0
+                ;;
+            [Cc]|[Cc][Oo][Pp][Yy])
+                printf "copy\n"
+                return 0
+                ;;
+        esac
+        printf "    Please answer 'ignore' or 'copy'.\n" >&2
+    done
+}
+
+git_tbw_copy_preserved_path() {
+    local old_root="$1"
+    local new_root="$2"
+    local relative_path="$3"
+    local source_path target_path
+
+    source_path="${old_root}/${relative_path}"
+    target_path="${new_root}/${relative_path}"
+
+    if ! git_tbw_path_exists "$source_path"; then
+        printf "ERROR: Selected path no longer exists: %s\n" "$source_path"
+        return 1
+    fi
+
+    if git_tbw_path_exists "$target_path"; then
+        printf "ERROR: Refusing to overwrite restored path: %s\n" "$target_path"
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$target_path")" || {
+        printf "ERROR: Failed to create parent directory for %s\n" "$target_path"
+        return 1
+    }
+
+    cp -PR "$source_path" "$target_path" || {
+        printf "ERROR: Failed to copy %s to %s\n" "$source_path" "$target_path"
+        return 1
+    }
+}
+
 git_to_bare_worktree() {
-    local repo_path remote_url repo_name parent_dir old_path new_path default_branch response
+    local repo_path remote_url repo_name parent_dir old_path new_path worktree_path default_branch response path action
+    local i
+    local -a candidate_paths candidate_kinds copy_paths
 
     if [[ -z "${1:-}" ]]; then
         printf "Usage: git_to_bare_worktree <repo-path> [remote-url]\n"
@@ -303,10 +361,51 @@ git_to_bare_worktree() {
     parent_dir=$(dirname "$repo_path")
     old_path="${parent_dir}/${repo_name}.old"
     new_path="${parent_dir}/${repo_name}"
+    worktree_path="${new_path}/main"
+    candidate_paths=()
+    candidate_kinds=()
+    copy_paths=()
 
     if [[ -e "$old_path" ]]; then
         printf "ERROR: Backup path already exists: %s\n" "$old_path"
         return 1
+    fi
+
+    while IFS= read -r -d '' path
+    do
+        if git_tbw_path_exists "${repo_path}/${path}"; then
+            candidate_paths+=("$path")
+            candidate_kinds+=("ignored")
+        fi
+    done < <(git -C "$repo_path" ls-files --full-name -o -i --exclude-standard -z)
+
+    while IFS= read -r -d '' path
+    do
+        if git_tbw_path_exists "${repo_path}/${path}"; then
+            candidate_paths+=("$path")
+            candidate_kinds+=("untracked")
+        fi
+    done < <(git -C "$repo_path" ls-files --full-name -o --exclude-standard -z)
+
+    if [[ ${#candidate_paths[@]} -gt 0 ]]; then
+        printf "Local-only paths detected in %s:\n" "$repo_path"
+        for i in "${!candidate_paths[@]}"
+        do
+            printf "  %s [%s]\n" "${candidate_paths[$i]}" "${candidate_kinds[$i]}"
+        done
+        printf "Choose 'ignore' to leave a path only in %s, or 'copy' to restore it into %s after refresh.\n" "$old_path" "$worktree_path"
+
+        for i in "${!candidate_paths[@]}"
+        do
+            action=$(git_tbw_prompt_candidate_action "${candidate_paths[$i]}" "${candidate_kinds[$i]}") || {
+                printf "ERROR: Failed while collecting preservation choices\n"
+                return 1
+            }
+            if [[ "$action" == "copy" ]]; then
+                copy_paths+=("${candidate_paths[$i]}")
+            fi
+        done
+        printf "\n"
     fi
 
     # inner restore helper
@@ -335,10 +434,10 @@ git_to_bare_worktree() {
         return 1
     fi
 
-    # enforce main as default branch
+    # enforce main as default branch only on non-Mark43 hosts
     default_branch=$(git -C "${new_path}/.bare" symbolic-ref HEAD 2>/dev/null)
     default_branch=${default_branch#refs/heads/}
-    if [[ "$default_branch" != "main" ]]; then
+    if ! mark43_host_p && [[ "$default_branch" != "main" ]]; then
         printf "ERROR: Remote default branch is '%s', not 'main'\n" "$default_branch"
         _git_tbw_restore
         return 1
@@ -355,6 +454,18 @@ git_to_bare_worktree() {
         printf "ERROR: Failed to add main worktree\n"
         _git_tbw_restore
         return 1
+    fi
+
+    if [[ ${#copy_paths[@]} -gt 0 ]]; then
+        printf "Restoring selected local-only paths into %s\n" "$worktree_path"
+        for path in "${copy_paths[@]}"
+        do
+            printf "  Copying %s\n" "$path"
+            if ! git_tbw_copy_preserved_path "$old_path" "$worktree_path" "$path"; then
+                _git_tbw_restore
+                return 1
+            fi
+        done
     fi
 
     printf "\nDone. Verify %s/main looks correct.\n" "$new_path"
