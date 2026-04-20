@@ -167,20 +167,70 @@ git_sync_log_msg() {
     printf "  %s\n" "$1"
 }
 
+git_sync_remote_ref() {
+    local remote="$1"
+    local ref="$2"
+
+    printf "refs/remotes/%s/%s" "$remote" "$ref"
+}
+
+git_sync_ensure_remote_fetch() {
+    local git_path="$1"
+    local remote="$2"
+    local fetch_refspec expected_refspec
+
+    expected_refspec="+refs/heads/*:refs/remotes/${remote}/*"
+    fetch_refspec=$(git -C "$git_path" config --get-all "remote.${remote}.fetch" 2>/dev/null)
+
+    if [[ "$fetch_refspec" != *"$expected_refspec"* ]]; then
+        git -C "$git_path" config --add "remote.${remote}.fetch" "$expected_refspec" || return 1
+    fi
+}
+
+git_sync_resolve_branch_worktree() {
+    local git_path="$1"
+    local ref="$2"
+    local worktree_path=""
+    local branch_ref=""
+    local line
+
+    while IFS= read -r line
+    do
+        case "$line" in
+            worktree\ *)
+                worktree_path=${line#worktree }
+                ;;
+            branch\ refs/heads/*)
+                branch_ref=${line#branch }
+                if [[ "$branch_ref" == "refs/heads/$ref" ]]; then
+                    printf "%s\n" "$worktree_path"
+                    return 0
+                fi
+                ;;
+            "")
+                worktree_path=""
+                branch_ref=""
+                ;;
+        esac
+    done < <(git -C "$git_path" worktree list --porcelain)
+
+    return 1
+}
+
 # fast-forward reference $ref to $remote/$ref
 git_fast_forward_ref() {
     local git_path="$1"
     local remote="$2"
     local ref="$3"
+    local remote_ref worktree_path
+
+    remote_ref=$(git_sync_remote_ref "$remote" "$ref")
     git_sync_log_msg "fast-forwarding ref $ref"
-    current_ref=$(cat "$git_path"/.git/HEAD)
-    if [ "$current_ref" = "ref: refs/heads/$ref" ]
-    then
-        # Check for dirty index
-        files=$(git -C "$git_path" diff-index --name-only HEAD --)
-        git -C "$git_path" merge refs/remotes/"$remote"/"$ref"
+
+    if worktree_path=$(git_sync_resolve_branch_worktree "$git_path" "$ref"); then
+        git -C "$worktree_path" merge --ff-only "$remote_ref"
     else
-        git -C "$git_path" branch -f "$ref" refs/remotes/"$remote"/"$ref"
+        git -C "$git_path" update-ref "refs/heads/$ref" "$remote_ref"
     fi
 }
 
@@ -205,8 +255,11 @@ git_check_ref() {
     local git_path="$1"
     local remote="$2"
     local ref="$3"
-    revlist1=$(git -C "$git_path" rev-list refs/remotes/"$remote"/"$ref".."$ref")
-    revlist2=$(git -C "$git_path" rev-list "$ref"..refs/remotes/"$remote"/"$ref")
+    local remote_ref revlist1 revlist2
+
+    remote_ref=$(git_sync_remote_ref "$remote" "$ref")
+    revlist1=$(git -C "$git_path" rev-list "${remote_ref}..$ref")
+    revlist2=$(git -C "$git_path" rev-list "$ref..${remote_ref}")
     if [ "x$revlist1" = "x" ] && [ "x$revlist2" = "x" ]
     then
         # Ref $ref is up to date.
@@ -230,24 +283,25 @@ git_check_ref() {
 git_check_refs() {
     local git_path="$1"
     local remote="$2"
-    git -C "$git_path" for-each-ref "refs/heads/*" | while read -r sha1 commit ref
+    local branch_ref ref
+
+    while IFS= read -r branch_ref
     do
-        ref=${ref/refs\/heads\//}
-        git -C "$git_path" for-each-ref refs/remotes/"$remote"/"$ref" | while read -r sha2 commit ref2
-        do
-            if [ "x$sha2" != "x" ] && [ "x$sha2" != "x" ]
-            then
-                git_check_ref "$git_path" "$remote" "$ref" || return 1
-            fi
-        done
-    done
+        ref=${branch_ref#refs/heads/}
+        if git -C "$git_path" show-ref --verify --quiet "$(git_sync_remote_ref "$remote" "$ref")"; then
+            git_check_ref "$git_path" "$remote" "$ref" || return 1
+        fi
+    done < <(git -C "$git_path" for-each-ref --format='%(refname)' "refs/heads/*")
 }
 
 # sync the remote down to local
 git_update_remote() {
     local git_path="$1"
     local remote="$2"
-    upd_out=$(git -C "$git_path" remote update "$remote" 2>& 1 || return 1)
+    local upd_out
+
+    git_sync_ensure_remote_fetch "$git_path" "$remote" || return 1
+    upd_out=$(git -C "$git_path" remote update "$remote" 2>&1) || return 1
     git_sync_log_msg "$git_path: $upd_out"
     [ "$upd_out" = "Fetching $remote" ] || {
         git_sync_log_msg "$git_path: $upd_out"
@@ -281,6 +335,87 @@ git_tbw_git_path_exists() {
 
     git_path=$(git -C "$repo_path" rev-parse --git-path "$git_path_name" 2>/dev/null) || return 1
     [[ -e "$git_path" ]]
+}
+
+git_tbw_normalize_existing_or_future_path() {
+    local raw_path="$1"
+    local path_dir path_base
+
+    if [[ -d "$raw_path" ]]; then
+        (cd "$raw_path" && pwd) || return 1
+        return 0
+    fi
+
+    path_dir=$(dirname "$raw_path")
+    path_base=$(basename "$raw_path")
+    if [[ -d "$path_dir" ]]; then
+        printf "%s/%s\n" "$(cd "$path_dir" && pwd)" "$path_base"
+        return 0
+    fi
+
+    return 1
+}
+
+git_tbw_expand_sync_path() {
+    local raw_arg="$1"
+
+    eval "printf '%s\n' ${raw_arg}" 2>/dev/null
+}
+
+git_tbw_matching_gs_functions() {
+    local repo_path="$1"
+    local worktree_path="$2"
+    local fn fn_body line sync_arg sync_path normalized_path
+
+    while IFS= read -r fn
+    do
+        [[ "$fn" == gs_* ]] || continue
+        fn_body=$(declare -f "$fn" 2>/dev/null) || continue
+
+        while IFS= read -r line
+        do
+            [[ "$line" =~ ^[[:space:]]*git_sync[[:space:]]+ ]] || continue
+
+            sync_arg=${line#*git_sync }
+            sync_arg=${sync_arg% origin}
+            sync_arg=${sync_arg% origin;}
+            sync_path=$(git_tbw_expand_sync_path "$sync_arg") || continue
+            normalized_path=$(git_tbw_normalize_existing_or_future_path "$sync_path") || continue
+
+            if [[ "$normalized_path" == "$repo_path" ]]; then
+                printf "%s\n" "$fn"
+                break
+            fi
+
+            if [[ "$normalized_path" == "$worktree_path" ]]; then
+                break
+            fi
+        done < <(printf "%s\n" "$fn_body")
+    done < <(declare -F | awk '{print $3}')
+}
+
+git_tbw_print_gs_update_reminder() {
+    local repo_path="$1"
+    local worktree_path="$2"
+    local fn
+    local -a matching_functions
+
+    matching_functions=()
+    while IFS= read -r fn
+    do
+        [[ -n "$fn" ]] && matching_functions+=("$fn")
+    done < <(git_tbw_matching_gs_functions "$repo_path" "$worktree_path")
+
+    [[ ${#matching_functions[@]} -gt 0 ]] || return 0
+
+    printf "Update the following gs_ function"
+    [[ ${#matching_functions[@]} -gt 1 ]] && printf "s"
+    printf " to sync %s instead of %s:\n" "$worktree_path" "$repo_path"
+
+    for fn in "${matching_functions[@]}"
+    do
+        printf "  - %s\n" "$fn"
+    done
 }
 
 git_tbw_report_unsafe_repo_state_items() {
@@ -584,6 +719,18 @@ git_to_bare_worktree() {
         return 1
     fi
 
+    if ! git -C "${new_path}/.bare" config "remote.${remote_name}.fetch" "+refs/heads/*:refs/remotes/${remote_name}/*"; then
+        printf "ERROR: Failed to configure %s fetch refspec\n" "$remote_name"
+        _git_tbw_restore
+        return 1
+    fi
+
+    if ! git -C "${new_path}/.bare" fetch "$remote_name"; then
+        printf "ERROR: Failed to fetch %s remote-tracking refs\n" "$remote_name"
+        _git_tbw_restore
+        return 1
+    fi
+
     echo "gitdir: ./.bare" > "${new_path}/.git" || {
         printf "ERROR: Failed to create .git file\n"
         _git_tbw_restore
@@ -611,6 +758,7 @@ git_to_bare_worktree() {
 
     printf "\nDone. Verify %s/main looks correct.\n" "$new_path"
     printf "Old repo saved at %s\n" "$old_path"
+    git_tbw_print_gs_update_reminder "$new_path" "$worktree_path"
 
     read -r -p "Remove old backup ${old_path}? [y/N] " response
     if [[ "$response" =~ ^[Yy]$ ]]; then
@@ -644,7 +792,7 @@ gs_notes() {
 }
 
 gs_dotfiles() {
-    git_sync "$(jwm_dir)/proj/jwm-dotfiles-2024" origin
+    git_sync "$(jwm_dir)/proj/jwm-dotfiles-2024/main" origin
     git_sync "$(jwm_dir)/proj/jwm-dotfiles" origin
     git_sync "$(jwm_dir)/proj/jeff-dotfiles" origin
 }
