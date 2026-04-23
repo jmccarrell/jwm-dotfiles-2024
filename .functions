@@ -361,6 +361,7 @@ gs_ebooks() {
 
 gs_literate-emacs-d() {
     git_sync "$(jwm_dir)/proj/literate-emacs.d" origin
+    git_sync "$(jwm_dir)/proj/emacs-config/literate-emacs.d" origin
 }
 
 gs_mark43_notes() {
