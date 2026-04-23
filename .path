@@ -161,7 +161,8 @@ function jwm_gcloud_sdk_path() {
 }
 
 function mark43_paths() {
-    declare -a mark43_paths=( $HOME/code/mark43/dev-tools/vault )
+    declare -a mark43_paths=( "$HOME/mark43/bin"
+                              "$HOME/code/mark43/dev-tools/vault" )
     printf "%s\n" "${mark43_paths[@]}"
 }
 
