@@ -13,6 +13,8 @@ $python\
 $character"""
 
 [directory]
+truncation_length = 2
+truncate_to_repo = false
 style = "blue"
 
 [character]
