@@ -9,7 +9,7 @@
 #
 # WIRING (per project, one-time, in the project's own justfile):
 #
-#     mod wt env_var('HOME') / '.config/just/worktree.just'
+#     mod wt  '~/.config/just/worktree.just'
 #
 # Then invoke the recipes with the `wt::` namespace prefix:
 #
