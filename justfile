@@ -3,6 +3,9 @@ set dotenv-load
 home_dir := env("HOME")
 test_dir := home_dir / "tmp/test-dotfiles"
 
+# load git worktree recipes
+mod wt '~/.config/just/worktree.just'
+
 @_:
     just --list
 

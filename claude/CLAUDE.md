@@ -1,25 +1,55 @@
-# Global Claude Code Instructions
+# Global Claude Context — Jeff McCarrell
 
-## GitHub
+## Working style
 
-- Use `gh` (GitHub CLI) for all GitHub operations: creating repos, PRs, issues, etc.
-- Create private repos with: `gh repo create <name> --private --source=. --remote=origin --push`
+- **When uncertain, ask first.** If the task is ambiguous or there are meaningful choices to make, stop and ask before proceeding. Don't assume and barrel ahead.
+- **Code-first.** Show the code or the change. Keep prose explanations brief unless I ask for more detail.
+- **Be direct.** Skip unnecessary preamble and filler. Get to the substance.
 
-## File Writing
+## Languages and tools
 
-- Always use Unix line endings (LF, `\n`) when writing files — never CRLF (`\r\n`)
+Primary: Python, Emacs Lisp, Shell/Bash
 
-## Git Repositories
+- Python: prefer standard library where sufficient; use virtual environments for projects with dependencies
+- Emacs Lisp: functions and variables use the `jwm/` prefix; package management via `use-package`
+- Shell: prefer bash; POSIX-compatible where portability matters
 
-- When creating any new git repository, immediately add a `.gitattributes` file with:
-  ```
-  * text=auto eol=lf
-  ```
+## Git worktree pattern
 
-## Python
+Several of Jeff's projects use a **bare repo + worktrees** layout:
 
-- Always use `uv` for all Python command interactions (e.g., `uv run python`, `uv add`, `uv pip install`, etc.)
-- Never invoke `python`, `python3`, or `pip` directly — always go through `uv`
-- Always use `uv run python` — never bare `python`, `python3`, or `uv run python3`
-- For every new Python-based project, use the starter template at `/Users/jeff/jwm/proj/python-uv-template` (includes Python, uv, and just setup)
-- When a `.env` file exists in the project directory, always pass it to uv: `uv run --env-file .env ...`
+```
+project-name/
+├── .bare/       ← bare git repo
+├── .git         ← pointer file: contains "gitdir: ./.bare"
+└── main/        ← main worktree (feature worktrees are siblings)
+    ├── CLAUDE.md
+    └── ...
+```
+
+When working in one of these repos:
+- All git commands and file work happen inside a worktree directory (e.g., `main/`), never at the top level
+- Each worktree is an independent checkout of a branch
+- `TASK.md` in a worktree root (if present) describes what that worktree is currently focused on — read it before starting work
+
+## Project workspaces
+
+### /Users/jeff/jwm/proj/emacs-config
+Jeff's Emacs configuration workspace. Not itself a git repo — contains:
+- `literate-emacs.d/` — worktree-enabled repo (bare + worktrees); active config project
+- `reference-emacs-configs/` — 14 cloned reference configs, read-only inspiration
+
+See `emacs-config/CLAUDE.md` for full workspace layout.
+See `emacs-config/literate-emacs.d/main/CLAUDE.md` for project conventions.
+
+### /Users/jeff/jwm/proj/jwm-dotfiles-2024
+Dotfiles repo. Worktree-enabled (bare + worktrees, same pattern as above).
+See `jwm-dotfiles-2024/main/CLAUDE.md` if present for project conventions.
+
+### /Users/jeff/pdata/jeff-ci
+Personal quantitative finance / CI project. Standard git repo (not worktree-enabled).
+See `jeff-ci/CLAUDE.md` for project conventions and architecture.
+
+## TASK.md convention
+
+In any worktree, a `TASK.md` file at the worktree root describes the current goal and approach. It is not tracked in git. Always read it before starting work if it exists.
