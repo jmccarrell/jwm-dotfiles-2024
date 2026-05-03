@@ -28,6 +28,15 @@
 # All recipes are run from inside a worktree (typically main/, or the
 # active feature worktree). Recipes that operate on a sibling worktree
 # expect to be invoked from a worktree that is NOT the target.
+#
+# CWD HANDLING: every functional recipe is annotated with `[no-cd]`
+# so it runs with cwd set to the user's invocation directory rather
+# than this module's own directory. Without this, git commands inside
+# recipes would resolve to whichever repo contains worktree.just
+# (typically the dotfiles repo) instead of the project where the
+# user ran `just wt::*`. The unreleased `set no-cd := true` setting
+# would let us drop the per-recipe attribute once it ships in a
+# tagged just release.
 
 # Default recipe: list everything in this module.
 @_:
@@ -37,6 +46,7 @@
 #
 # Run from any existing worktree (typically main/). Creates the new
 # worktree at ../{{feature}}/ on a fresh branch named {{feature}}.
+[no-cd]
 new feature:
     git worktree add ../{{feature}} -b {{feature}}
     @echo ""
@@ -48,6 +58,7 @@ new feature:
 #
 # Cross-machine continuation. Fetches origin, then creates ../{{feature}}/
 # as a worktree tracking origin/{{feature}}.
+[no-cd]
 track feature:
     git fetch origin
     git worktree add -B {{feature}} ../{{feature}} origin/{{feature}}
@@ -59,6 +70,7 @@ track feature:
 #
 # Mutates nothing locally. Use as a session-start sync check or any time
 # you want to know what would need to happen to align with origin.
+[no-cd]
 status:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -78,6 +90,7 @@ status:
     done
 
 # List worktrees with their branches.
+[no-cd]
 list:
     git worktree list
 
@@ -85,6 +98,7 @@ list:
 #
 # Stage your files first (`git add ...`); this recipe does not stage on
 # your behalf. Run AFTER your project's verification step has passed.
+[no-cd]
 fixup:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -103,13 +117,16 @@ fixup:
 #
 # Collapses the fixup chain into the targeted real commit. Run after
 # the sub-goal is verified and ready to merge.
+[no-cd]
 squash:
     git rebase --interactive --autosquash main
 
 # Close the sub-goal: remove TASK.md, fixup the deletion, autosquash.
 #
-# After this returns, push with: git push --force-with-lease
+# Run from the feature worktree being closed (HEAD must be that branch).
+# After this returns, push with: git push --force-with-lease.
 # Run AFTER your project's verification step has passed.
+[no-cd]
 close:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -130,6 +147,7 @@ close:
 #
 # Run from a worktree OTHER than the one being removed (typically main/).
 # Use after the branch has been merged.
+[no-cd]
 clean feature:
     git worktree remove ../{{feature}}
     git branch -d {{feature}}
