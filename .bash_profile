@@ -43,6 +43,8 @@ if brew_cmd=$(jwm_brew_cmd 2>/dev/null); then
     fi;
 fi;
 
+command -v asdf &> /dev/null && source <(asdf completion bash)
+
 # ensure kitty terminal is in my path on OS X
 if [ -e '/Applications/kitty.app/Contents/MacOS/kitty' ]; then
     if [ ! -d ~/.local/bin ]; then
