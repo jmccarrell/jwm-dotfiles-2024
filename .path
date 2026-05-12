@@ -160,6 +160,16 @@ function jwm_gcloud_sdk_path() {
     printf '\n'
 }
 
+# add the standard asdf path.
+function asdf_shims() {
+    asdf_shims="${ASDF_DATA_DIR:-$HOME/.asdf}/shims"
+    if [[ -e "${asdf_shims}" ]]; then
+        printf "%s\n" "$asdf_shims"
+        return
+    fi
+    printf '\n'
+}
+
 function mark43_paths() {
     declare -a mark43_paths=( "$HOME/mark43/bin"
                               "$HOME/code/mark43/dev-tools/vault" )
@@ -199,6 +209,7 @@ function jwm_set_path() {
 
     for dir in \
         $(nix_path) \
+        $(asdf_shims) \
         $(jwm_home_paths) \
         $(mark43_paths) \
         $(jwm_go_bin_paths) \
