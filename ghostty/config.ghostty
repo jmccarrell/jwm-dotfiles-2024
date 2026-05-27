@@ -1,0 +1,22 @@
+# Ghostty configuration
+# Stowed by jwm-dotfiles-2024 into ~/.config/ghostty/config.ghostty
+#
+# Notes:
+# - On macOS, ~/.config/ghostty/ is loaded BEFORE ~/Library/Application Support/com.mitchellh.ghostty/.
+#   If both files exist with content, Library wins silently — keep that file empty (or deleted).
+# - The `global:` keybind prefix requires Ghostty to have Accessibility permission
+#   (System Settings -> Privacy & Security -> Accessibility).
+
+# --- Font ---
+font-family = "Hack"
+font-size = 18
+
+# --- Quick Terminal (drop-down popup) ---
+# Toggle a borderless terminal window from anywhere with Ctrl+`.
+# (Cmd+` is reserved for the macOS "cycle windows of current app" shortcut.)
+keybind = global:ctrl+grave_accent=toggle_quick_terminal
+
+quick-terminal-position = top
+quick-terminal-animation-duration = 0.2
+quick-terminal-autohide = true
+# quick-terminal-screen defaults to `mouse` — fine for laptop + external display setups.
