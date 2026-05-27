@@ -2,7 +2,6 @@
 # Stowed by jwm-dotfiles-2024 into ~/.config/ghostty/config.ghostty
 #
 # Notes:
-# - Ghostty 1.2.3+ prefers the .ghostty extension; the plain `config` name still works.
 # - On macOS, ~/.config/ghostty/ is loaded BEFORE ~/Library/Application Support/com.mitchellh.ghostty/.
 #   If both files exist with content, Library wins silently — keep that file empty (or deleted).
 # - The `global:` keybind prefix requires Ghostty to have Accessibility permission
