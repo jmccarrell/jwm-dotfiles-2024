@@ -16,10 +16,10 @@ stow-pkg target pkg *ignore:
     stow --verbose --adopt {{ignore}} -t {{target}} -S {{pkg}}
 
 # Install all dotfiles
-install: (stow-pkg home_dir "." "--ignore=justfile --ignore=kitty --ignore=claude") (stow-pkg (home_dir / ".config/kitty") "kitty") (stow-pkg (home_dir / ".claude") "claude")
+install: (stow-pkg home_dir "." "--ignore=justfile --ignore=kitty --ignore=claude --ignore=ghostty") (stow-pkg (home_dir / ".config/kitty") "kitty") (stow-pkg (home_dir / ".config/ghostty") "ghostty") (stow-pkg (home_dir / ".claude") "claude")
 
 # Test install into temp directory
-test: (stow-pkg test_dir "." "--ignore=justfile --ignore=kitty --ignore=claude") (stow-pkg (test_dir / ".config/kitty") "kitty") (stow-pkg (test_dir / ".claude") "claude")
+test: (stow-pkg test_dir "." "--ignore=justfile --ignore=kitty --ignore=claude --ignore=ghostty") (stow-pkg (test_dir / ".config/kitty") "kitty") (stow-pkg (test_dir / ".config/ghostty") "ghostty") (stow-pkg (test_dir / ".claude") "claude")
 
 # Clean test directory
 clean:
