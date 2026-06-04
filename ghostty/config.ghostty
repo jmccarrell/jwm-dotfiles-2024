@@ -14,7 +14,7 @@ font-size = 18
 # --- Quick Terminal (drop-down popup) ---
 # Toggle a borderless terminal window from anywhere with Ctrl+`.
 # (Cmd+` is reserved for the macOS "cycle windows of current app" shortcut.)
-keybind = global:ctrl+grave_accent=toggle_quick_terminal
+keybind = global:shift+ctrl+grave_accent=toggle_quick_terminal
 
 quick-terminal-position = top
 quick-terminal-animation-duration = 0.2
