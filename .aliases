@@ -120,4 +120,8 @@ if command -v kubectl-argo-rollouts > /dev/null; then
     alias kar='kubectl-argo-rollouts'
     complete -F __start_kubectl-argo-rollouts kar
 fi
+
+# git worktree aliases
+alias gwt-list='git worktree list'
+
 # jwm-end
