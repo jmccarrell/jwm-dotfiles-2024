@@ -338,9 +338,7 @@ gs_notes() {
 }
 
 gs_dotfiles() {
-    git_sync "$(jwm_dir)/proj/jwm-dotfiles-2024/main" origin
-    git_sync "$(jwm_dir)/proj/jwm-dotfiles" origin
-    git_sync "$(jwm_dir)/proj/jeff-dotfiles" origin
+    git_sync "$(jwm_dir)/proj/jwm-dotfiles-2024" origin
 }
 
 gs_jwm_bin() {
