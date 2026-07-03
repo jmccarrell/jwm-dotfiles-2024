@@ -144,6 +144,10 @@ if command -v kubectl-argo-rollouts > /dev/null; then
     complete -F __start_kubectl-argo-rollouts kar
 fi
 
+# k9s aliases
+# start k9s in the pulse view for an overview
+alias k9p='k9s -c pulse'
+
 # git worktree aliases
 alias gwt-list='git worktree list'
 
