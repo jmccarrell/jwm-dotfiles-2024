@@ -109,8 +109,16 @@ alias path='echo -e ${PATH//:/\\n}'
 if command -v kubectl > /dev/null; then
    alias k=kubectl;
    complete -o default -F __start_kubectl k;
+fi
 
-   alias kx='f() { [ "$1" ] && kubectl config use-context $1 || kubectl config current-context ; } ; f';
+if command -v kubectx > /dev/null; then
+   alias kx=kubectx;
+   # kubectx ships a bash completion for `kubectx`/`kctx`; extend it to `kx`.
+   if [ -r /opt/homebrew/etc/bash_completion.d/kubectx ]; then
+      # shellcheck source=/dev/null
+      source /opt/homebrew/etc/bash_completion.d/kubectx;
+      complete -F _kube_contexts kx;
+   fi
 fi
 
 if command -v kubens > /dev/null; then
@@ -125,6 +133,7 @@ fi
 if command -v kubectl-argo-rollouts > /dev/null; then
     # jwm: well this doesn't provide the completions I expect
     # but move on for now...
+    # shellcheck source=/dev/null
     source <(kubectl-argo-rollouts completion bash)
     alias kar='kubectl-argo-rollouts'
     complete -F __start_kubectl-argo-rollouts kar
