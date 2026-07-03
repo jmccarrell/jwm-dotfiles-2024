@@ -113,6 +113,15 @@ if command -v kubectl > /dev/null; then
    alias kx='f() { [ "$1" ] && kubectl config use-context $1 || kubectl config current-context ; } ; f';
 fi
 
+if command -v kubens > /dev/null; then
+   alias kns=kubens;
+   # kubens ships a bash completion that registers both `kubens` and `kns`.
+   if [ -r /opt/homebrew/etc/bash_completion.d/kubens ]; then
+      # shellcheck source=/dev/null
+      source /opt/homebrew/etc/bash_completion.d/kubens;
+   fi
+fi
+
 if command -v kubectl-argo-rollouts > /dev/null; then
     # jwm: well this doesn't provide the completions I expect
     # but move on for now...
