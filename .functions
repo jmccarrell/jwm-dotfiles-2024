@@ -366,6 +366,15 @@ gs_mark43_notes() {
     git_sync "${HOME}/mark43/notes" origin
 }
 
+gs_lab() {
+    git_sync "$(jwm_dir)/proj/lab/lab-infra" origin
+    git_sync "$(jwm_dir)/proj/lab/lab-gitops" origin
+}
+
+gs_tome() {
+    git_sync "$(jwm_dir)/proj/tome/tome" origin
+}
+
 gs_all() {
     gs_todo
     gs_notes
@@ -376,6 +385,8 @@ gs_all() {
     gs_jwm_pdata_notes
     gs_home_lab
     gs_ebooks
+    gs_lab
+    gs_tome
 }
 
 # git worktree functions
