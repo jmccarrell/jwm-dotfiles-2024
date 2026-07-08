@@ -294,6 +294,45 @@ git_check_refs() {
     done < <(git -C "$git_path" for-each-ref --format='%(refname)' "refs/heads/*")
 }
 
+git_check_ref_pull_only() {
+    local git_path="$1"
+    local remote="$2"
+    local ref="$3"
+    local remote_ref revlist1 revlist2
+
+    remote_ref=$(git_sync_remote_ref "$remote" "$ref")
+    revlist1=$(git -C "$git_path" rev-list "${remote_ref}..$ref") || return 1
+    revlist2=$(git -C "$git_path" rev-list "$ref..${remote_ref}") || return 1
+    if [ "x$revlist1" = "x" ] && [ "x$revlist2" = "x" ]
+    then
+        # Ref $ref is up to date.
+        :
+    elif [ "x$revlist1" = "x" ]
+    then
+        # Ref $ref is behind $remote/$ref and can be fast-forwarded.
+        git_fast_forward_ref "$git_path" "$remote" "$ref" || return 1
+    elif [ "x$revlist2" = "x" ]
+    then
+        git_sync_log_msg "Ref $ref is ahead of $remote/$ref; skipping push."
+    else
+        git_sync_log_msg "Ref $ref and $remote/$ref have diverged; skipping."
+    fi
+}
+
+git_check_refs_pull_only() {
+    local git_path="$1"
+    local remote="$2"
+    local branch_ref ref
+
+    while IFS= read -r branch_ref
+    do
+        ref=${branch_ref#refs/heads/}
+        if git -C "$git_path" show-ref --verify --quiet "$(git_sync_remote_ref "$remote" "$ref")"; then
+            git_check_ref_pull_only "$git_path" "$remote" "$ref" || return 1
+        fi
+    done < <(git -C "$git_path" for-each-ref --format='%(refname)' "refs/heads/*")
+}
+
 # sync the remote down to local
 git_update_remote() {
     local git_path="$1"
@@ -314,6 +353,60 @@ git_sync() {
     [[ -d $git_path ]] || return 1
     git_update_remote "$git_path" "$remote" || return 1
     git_check_refs "$git_path" "$remote" || return 1
+}
+
+git_sync_pull_only() {
+    local git_path="$1"
+    local remote="$2"
+    [[ -d $git_path ]] || return 1
+    git_update_remote "$git_path" "$remote" || return 1
+    git_check_refs_pull_only "$git_path" "$remote" || return 1
+}
+
+git_mark43_remote_p() {
+    local remote_url="$1"
+
+    case "$remote_url" in
+        git@github.com:mark43/*|https://github.com/mark43/*|ssh://git@github.com/mark43/*)
+            return 0
+            ;;
+        git@github.internal-mark43.us:*|https://github.internal-mark43.us/*|ssh://git@github.internal-mark43.us/*)
+            return 0
+            ;;
+        git@github.internal-mark43-staging.us:*|https://github.internal-mark43-staging.us/*|ssh://git@github.internal-mark43-staging.us/*)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+git_repo_toplevel_p() {
+    local git_path="$1"
+    local repo_path toplevel_path
+
+    repo_path=$(cd "$git_path" && pwd -P) || return 1
+    toplevel_path=$(git -C "$git_path" rev-parse --show-toplevel 2>/dev/null) || return 1
+    toplevel_path=$(cd "$toplevel_path" && pwd -P) || return 1
+
+    [[ "$repo_path" == "$toplevel_path" ]]
+}
+
+git_mark43_repo_paths() {
+    local code_dir="${HOME}/code"
+    local git_path remote_url
+
+    [[ -d "$code_dir" ]] || return 0
+
+    for git_path in "$code_dir" "$code_dir"/*
+    do
+        [[ -d "$git_path" ]] || continue
+        git_repo_toplevel_p "$git_path" || continue
+        remote_url=$(git -C "$git_path" remote get-url origin 2>/dev/null) || continue
+        if git_mark43_remote_p "$remote_url"; then
+            printf "%s\n" "$git_path"
+        fi
+    done
 }
 
 
@@ -364,6 +457,19 @@ gs_literate-emacs-d() {
 
 gs_mark43_notes() {
     git_sync "${HOME}/mark43/notes" origin
+}
+
+gs_mark43_repos() {
+    local git_path status
+
+    status=0
+    while IFS= read -r git_path
+    do
+        git_sync_log_msg "Syncing $git_path"
+        git_sync_pull_only "$git_path" origin || status=1
+    done < <(git_mark43_repo_paths)
+
+    return "$status"
 }
 
 gs_lab() {
