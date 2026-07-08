@@ -486,7 +486,10 @@ gs_all() {
     gs_notes
     gs_literate-emacs-d
     gs_dotfiles
-    gs_mark43_notes
+    if mark43_host_p; then
+        gs_mark43_notes
+        gs_mark43_repos
+    fi
     gs_jwm_bin
     gs_jwm_pdata_notes
     gs_home_lab
