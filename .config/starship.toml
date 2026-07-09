@@ -12,6 +12,13 @@ $line_break\
 $python\
 $character"""
 
+[username]
+disabled = true
+
+[hostname]
+# Bare hostname over SSH: drop the default ssh_symbol (🌐) and trailing " in ".
+format = "[$hostname]($style) "
+
 [directory]
 truncation_length = 2
 truncate_to_repo = false
