@@ -1,15 +1,19 @@
 # Add `~/bin` to the `$PATH`
 export PATH="$HOME/bin:$PATH";
 
-# Load the shell dotfiles, and then some:
-# * ~/.path can be used to extend `$PATH`.
-# * ~/.extra can be used for other settings you don’t want to commit.
-for file in ~/.{functions,path,exports,aliases,extra}; do
+# Load shell functions and PATH definitions.
+for file in ~/.{functions,path}; do
     [ -r "$file" ] && [ -f "$file" ] && source "$file";
 done;
 
 # set up PATH
 jwm_set_path
+
+# Load settings that can rely on the finalized PATH.
+# * ~/.extra can be used for other settings you don’t want to commit.
+for file in ~/.{exports,aliases,extra}; do
+    [ -r "$file" ] && [ -f "$file" ] && source "$file";
+done;
 
 # Case-insensitive globbing (used in pathname expansion)
 shopt -s nocaseglob;
