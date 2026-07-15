@@ -31,15 +31,25 @@ for option in autocd globstar; do
     shopt -s "$option" 2> /dev/null;
 done;
 
-# Add tab completion for many Bash commands
-# based on prior installation of bash-completion (not bash-completion@2)
-# brew install bash-completion
+# Add tab completion for many Bash commands.
+#   brew install bash-completion@2      (needs bash >= 4.2; we run Homebrew bash 5.x)
+#
+# v2 lazily sources a completion the first time you TAB a command, rather than
+# eagerly sourcing every script at startup the way v1 did.  It searches
+# $BASH_COMPLETION_USER_DIR/completions first, so tools that generate their own
+# completion script just drop one file named after the command there; see
+# jwm_refresh_completions below.  BASH_COMPLETION_COMPAT_DIR keeps any remaining
+# v1-style scripts under etc/bash_completion.d working.
+#
+# Must be exported before bash_completion.sh is sourced: v2 builds its lookup
+# path at source time.
+export BASH_COMPLETION_USER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion";
+
 brew_cmd=''
 if brew_cmd=$(jwm_brew_cmd 2>/dev/null); then
     bp=''
     bp=$("$brew_cmd" --prefix 2>/dev/null)
     if [ -r "${bp}/etc/profile.d/bash_completion.sh" ]; then
-        # Ensure existing Homebrew v1 completions continue to work
         export BASH_COMPLETION_COMPAT_DIR="${bp}/etc/bash_completion.d";
         source "${bp}/etc/profile.d/bash_completion.sh";
     elif [ -f /etc/bash_completion ]; then
@@ -90,6 +100,39 @@ fi
 
 command -v starship &> /dev/null && eval "$(starship init bash)"
 command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
+
+# Generate bash completions for CLI tools that emit their own script.
+# bash-completion@2 lazily sources $BASH_COMPLETION_USER_DIR/completions/<cmd>
+# on the first TAB for <cmd>, so these only need writing once -- not on every
+# shell start.  They are generated artifacts and stay out of git; this function
+# is the tracked recipe.  Re-run it by hand after a toolchain or tool upgrade:
+#
+#     jwm_refresh_completions
+#
+# Deliberately placed after ~/.cargo/env and the asdf/PATH setup above, so the
+# `command -v` probes below can actually see rustup, ruff, and friends.
+jwm_refresh_completions() {
+    local d="${BASH_COMPLETION_USER_DIR}/completions"
+    mkdir -p "$d" || return 1
+
+    # `rustup completions bash cargo` emits a shim that sources
+    # "$(rustc --print sysroot)"/etc/bash_completion.d/cargo, resolving the
+    # sysroot at source time -- so it survives `rustup update` and toolchain
+    # switches, where a copied script would go stale.
+    if command -v rustup > /dev/null; then
+        rustup completions bash          > "$d/rustup"
+        rustup completions bash cargo    > "$d/cargo"
+    fi
+    command -v rg   > /dev/null && rg --generate=complete-bash          > "$d/rg"
+    command -v just > /dev/null && just --completions bash              > "$d/just"
+    command -v uv   > /dev/null && uv generate-shell-completion bash    > "$d/uv"
+    command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
+
+    printf 'bash completions refreshed in %s\n' "$d"
+}
+
+# Bootstrap once on a fresh machine; afterwards refresh explicitly.
+[ -d "${BASH_COMPLETION_USER_DIR}/completions" ] || jwm_refresh_completions
 
 # Added by OrbStack: command-line tools and integration
 # This won't be added again if you remove it.
