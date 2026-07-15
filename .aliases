@@ -50,7 +50,9 @@ alias egrep='egrep --color=auto'
 # alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup; npm install npm -g; npm update -g; sudo gem update --system; sudo gem update; sudo gem cleanup'
 # jwm: no brew cleanup; gems seem bound to specific .so libs; and that causes too much pain.
 # alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup'
-alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask'
+# jwm_refresh_completions (defined in .bash_profile) runs last so regenerated
+# completion scripts match the just-upgraded tool versions.
+alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; jwm_refresh_completions'
 
 # Canonical hex dump; some systems have this symlinked
 command -v hd > /dev/null || alias hd="hexdump -C"
