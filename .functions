@@ -451,8 +451,10 @@ gs_ebooks() {
 }
 
 gs_literate-emacs-d() {
-    git_sync "$(jwm_dir)/proj/emacs-config" origin
-    git_sync "$(jwm_dir)/proj/emacs-config/literate-emacs.d" origin
+    local status=0
+    git_sync "$(jwm_dir)/proj/emacs-config" origin || status=1
+    git_sync "$(jwm_dir)/proj/emacs-config/literate-emacs.d" origin || status=1
+    return "$status"
 }
 
 gs_mark43_notes() {
@@ -473,29 +475,40 @@ gs_mark43_repos() {
 }
 
 gs_lab() {
-    git_sync "$(jwm_dir)/proj/lab/lab-infra" origin
-    git_sync "$(jwm_dir)/proj/lab/lab-gitops" origin
+    local status=0
+    git_sync "$(jwm_dir)/proj/lab/lab-infra" origin || status=1
+    git_sync "$(jwm_dir)/proj/lab/lab-gitops" origin || status=1
+    return "$status"
 }
 
 gs_tome() {
     git_sync "$(jwm_dir)/proj/tome/tome" origin
 }
 
+# Sync every repo. Runs all syncs even if some fail; records the labels of any
+# that failed in the global GS_ALL_FAILURES array and returns non-zero if any
+# did. Callers (interactive shell, the `daily` launchd job) can read
+# GS_ALL_FAILURES to report which repos need attention.
 gs_all() {
-    gs_todo
-    gs_notes
-    gs_literate-emacs-d
-    gs_dotfiles
+    local status=0
+    GS_ALL_FAILURES=()
+
+    gs_todo             || { GS_ALL_FAILURES+=(todo);             status=1; }
+    gs_notes            || { GS_ALL_FAILURES+=(notes);            status=1; }
+    gs_literate-emacs-d || { GS_ALL_FAILURES+=(literate-emacs-d); status=1; }
+    gs_dotfiles         || { GS_ALL_FAILURES+=(dotfiles);         status=1; }
     if mark43_host_p; then
-        gs_mark43_notes
-        gs_mark43_repos
+        gs_mark43_notes || { GS_ALL_FAILURES+=(mark43_notes);     status=1; }
+        gs_mark43_repos || { GS_ALL_FAILURES+=(mark43_repos);     status=1; }
     fi
-    gs_jwm_bin
-    gs_jwm_pdata_notes
-    gs_home_lab
-    gs_ebooks
-    gs_lab
-    gs_tome
+    gs_jwm_bin          || { GS_ALL_FAILURES+=(jwm_bin);          status=1; }
+    gs_jwm_pdata_notes  || { GS_ALL_FAILURES+=(jwm_pdata_notes);  status=1; }
+    gs_home_lab         || { GS_ALL_FAILURES+=(home_lab);         status=1; }
+    gs_ebooks           || { GS_ALL_FAILURES+=(ebooks);           status=1; }
+    gs_lab              || { GS_ALL_FAILURES+=(lab);              status=1; }
+    gs_tome             || { GS_ALL_FAILURES+=(tome);             status=1; }
+
+    return "$status"
 }
 
 # git worktree functions
