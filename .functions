@@ -350,7 +350,13 @@ git_update_remote() {
 git_sync() {
     local git_path="$1"
     local remote="$2"
-    [[ -d $git_path ]] || return 1
+    # A repo that isn't checked out on this machine (personal repos on the work
+    # mac, and vice versa) is a skip, not a failure -- so gs_all only flags real
+    # sync problems on repos that are actually present.
+    if [[ ! -d $git_path ]]; then
+        git_sync_log_msg "skipping $git_path: not present on this machine"
+        return 0
+    fi
     git_update_remote "$git_path" "$remote" || return 1
     git_check_refs "$git_path" "$remote" || return 1
 }
@@ -358,7 +364,10 @@ git_sync() {
 git_sync_pull_only() {
     local git_path="$1"
     local remote="$2"
-    [[ -d $git_path ]] || return 1
+    if [[ ! -d $git_path ]]; then
+        git_sync_log_msg "skipping $git_path: not present on this machine"
+        return 0
+    fi
     git_update_remote "$git_path" "$remote" || return 1
     git_check_refs_pull_only "$git_path" "$remote" || return 1
 }
