@@ -502,20 +502,23 @@ gs_all() {
     local status=0
     GS_ALL_FAILURES=()
 
+    # personal repos first
     gs_todo             || { GS_ALL_FAILURES+=(todo);             status=1; }
     gs_notes            || { GS_ALL_FAILURES+=(notes);            status=1; }
     gs_literate-emacs-d || { GS_ALL_FAILURES+=(literate-emacs-d); status=1; }
     gs_dotfiles         || { GS_ALL_FAILURES+=(dotfiles);         status=1; }
-    if mark43_host_p; then
-        gs_mark43_notes || { GS_ALL_FAILURES+=(mark43_notes);     status=1; }
-        gs_mark43_repos || { GS_ALL_FAILURES+=(mark43_repos);     status=1; }
-    fi
     gs_jwm_bin          || { GS_ALL_FAILURES+=(jwm_bin);          status=1; }
     gs_jwm_pdata_notes  || { GS_ALL_FAILURES+=(jwm_pdata_notes);  status=1; }
     gs_home_lab         || { GS_ALL_FAILURES+=(home_lab);         status=1; }
     gs_ebooks           || { GS_ALL_FAILURES+=(ebooks);           status=1; }
     gs_lab              || { GS_ALL_FAILURES+=(lab);              status=1; }
     gs_tome             || { GS_ALL_FAILURES+=(tome);             status=1; }
+
+    # then mark43 repos
+    if mark43_host_p; then
+        gs_mark43_notes || { GS_ALL_FAILURES+=(mark43_notes);     status=1; }
+        gs_mark43_repos || { GS_ALL_FAILURES+=(mark43_repos);     status=1; }
+    fi
 
     return "$status"
 }
