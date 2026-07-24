@@ -339,8 +339,16 @@ git_update_remote() {
     local remote="$2"
     local upd_out
 
-    git_sync_ensure_remote_fetch "$git_path" "$remote" || return 1
-    upd_out=$(git -C "$git_path" remote update "$remote" 2>&1) || return 1
+    if ! git_sync_ensure_remote_fetch "$git_path" "$remote"; then
+        git_sync_log_msg "$git_path: FAILED to configure fetch refspec for $remote"
+        return 1
+    fi
+    # Capture stdout+stderr so a failure (e.g. host unreachable when off VPN)
+    # is logged rather than silently swallowed by the `|| return 1`.
+    if ! upd_out=$(git -C "$git_path" remote update "$remote" 2>&1); then
+        git_sync_log_msg "$git_path: FAILED remote update: $upd_out"
+        return 1
+    fi
     git_sync_log_msg "$git_path: $upd_out"
     [ "$upd_out" = "Fetching $remote" ] || {
         git_sync_log_msg "$git_path: $upd_out"
