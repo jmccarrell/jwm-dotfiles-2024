@@ -199,9 +199,6 @@ function jwm_set_path() {
     if command -v pyenv > /dev/null; then eval "$(pyenv init -)"; fi
     if command -v pyenv-virtualenv-init > /dev/null; then eval "$(pyenv virtualenv-init -)"; fi
 
-    # let sdkman do its thing
-    [[ -s "${HOME}/.sdkman/bin/sdkman-init.sh" ]] && source "${HOME}/.sdkman/bin/sdkman-init.sh"
-
     # then prepend my preferred paths
     # first, remove any duplicate path elements
     local -A dedup
