@@ -124,8 +124,16 @@ function tre() {
 #
 # jeffs functions
 #
+function jwm_host_p {
+    dir=$HOME/pdata
+    if [[ -e $dir && -d $dir ]]; then
+        return 0;
+    fi;
+    return 1;
+}
 
-# if this a Mark43 laptop?
+
+# is this a Mark43 laptop?
 function mark43_host_p {
     dir=$HOME/code/dev43
     if [[ -e $dir && -d $dir ]]; then
@@ -459,10 +467,6 @@ gs_jwm_pdata_notes() {
     git_sync "${HOME}/pdata/notes" origin
 }
 
-gs_home_lab() {
-    git_sync "${HOME}/pdata/proj/home-lab-infra" origin
-}
-
 gs_ebooks() {
     git_sync "$(jwm_dir)/ebooks" origin
 }
@@ -510,17 +514,20 @@ gs_all() {
     local status=0
     GS_ALL_FAILURES=()
 
-    # personal repos first
-    gs_todo             || { GS_ALL_FAILURES+=(todo);             status=1; }
-    gs_notes            || { GS_ALL_FAILURES+=(notes);            status=1; }
+    # personal repos first that live only on jeffs mac
+    if jwm_host_p; then
+        gs_todo             || { GS_ALL_FAILURES+=(todo);             status=1; }
+        gs_notes            || { GS_ALL_FAILURES+=(notes);            status=1; }
+        gs_jwm_pdata_notes  || { GS_ALL_FAILURES+=(jwm_pdata_notes);  status=1; }
+        gs_ebooks           || { GS_ALL_FAILURES+=(ebooks);           status=1; }
+        gs_lab              || { GS_ALL_FAILURES+=(lab);              status=1; }
+        gs_tome             || { GS_ALL_FAILURES+=(tome);             status=1; }
+    fi;
+
+    # common repos everywhere
     gs_literate-emacs-d || { GS_ALL_FAILURES+=(literate-emacs-d); status=1; }
     gs_dotfiles         || { GS_ALL_FAILURES+=(dotfiles);         status=1; }
     gs_jwm_bin          || { GS_ALL_FAILURES+=(jwm_bin);          status=1; }
-    gs_jwm_pdata_notes  || { GS_ALL_FAILURES+=(jwm_pdata_notes);  status=1; }
-    gs_home_lab         || { GS_ALL_FAILURES+=(home_lab);         status=1; }
-    gs_ebooks           || { GS_ALL_FAILURES+=(ebooks);           status=1; }
-    gs_lab              || { GS_ALL_FAILURES+=(lab);              status=1; }
-    gs_tome             || { GS_ALL_FAILURES+=(tome);             status=1; }
 
     # then mark43 repos
     if mark43_host_p; then
