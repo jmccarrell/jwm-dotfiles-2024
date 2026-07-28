@@ -28,6 +28,35 @@ never off a bare root.
 - `TASK.md` in a worktree/repo root (if present) describes what that checkout is
   currently focused on — read it before starting work.
 
+## Git authority
+
+Claude may do these without asking:
+
+- create feature worktrees and branches
+- commit on feature branches (amend only commits that haven't been pushed)
+- push feature branches (never push main; never use `--force`)
+- manage issues and PRs: `gh` for GitHub repos, `tea` for Forgejo-hosted repos
+- after Jeff merges a PR: remove that branch's worktree and delete the local
+  branch Claude created for it — and the remote branch too, if Claude created
+  it and the host didn't already auto-delete it — provided nothing outside the
+  repo depends on that checkout (each project's CLAUDE.md defines its own
+  checks)
+
+Claude must never do these itself — it hands Jeff the exact command instead:
+
+- commit anything to main, or merge any branch into main
+- delete any branch that is unmerged, or that Claude did not create
+- rewrite pushed history — no rebase, amend, or reset of commits that are
+  already on the remote
+- force-push anything
+- add, remove, or repoint git remotes, or change repo settings
+
+Main checkouts are read-only for Claude, file edits included — all work, code
+and docs, lands via feature worktree + PR.
+
+If the next required step is on the never-list and Jeff is unavailable: stop
+and ask. Never work around it.
+
 ## Project workspaces
 
 ### /Users/jeff/jwm/proj/emacs-config
