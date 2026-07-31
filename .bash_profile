@@ -101,6 +101,14 @@ fi
 command -v starship &> /dev/null && eval "$(starship init bash)"
 command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
 
+# worktrunk (wt) git-worktree manager.  The eval defines a `wt` shell function
+# wrapping the binary; without it `wt switch` cannot change this shell's cwd.
+# `command wt` is required: on a re-source the function already exists and a
+# bare `wt` would recurse into it instead of reaching the binary.  The emitted
+# script registers its own lazy completion, so `wt` is deliberately absent from
+# jwm_refresh_completions below.
+command -v wt &> /dev/null && eval "$(command wt config shell init bash)"
+
 # Generate bash completions for CLI tools that emit their own script.
 # bash-completion@2 lazily sources $BASH_COMPLETION_USER_DIR/completions/<cmd>
 # on the first TAB for <cmd>, so these only need writing once -- not on every
