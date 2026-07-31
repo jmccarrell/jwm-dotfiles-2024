@@ -38,7 +38,7 @@ status:
     repo="$(pwd)"
     fail=0
     # ~/.config and the managed subdirs must stay real dirs (the folding tripwire)
-    for d in .config .config/kitty .config/ghostty .config/direnv; do
+    for d in .config .config/kitty .config/ghostty .config/direnv .config/worktrunk; do
       t="{{home_dir}}/$d"
       if [ -L "$t" ]; then echo "✗ $d is a SYMLINK (folded!) — must be a real dir"; fail=1
       elif [ -d "$t" ]; then echo "✓ $d is a real dir"

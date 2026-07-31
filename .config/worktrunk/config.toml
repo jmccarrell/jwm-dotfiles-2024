@@ -1,0 +1,7 @@
+# Worktrunk user configuration — https://worktrunk.dev/config/
+#
+# Worktrees live in a sibling container dir named <repo>.worktrees/, one
+# subdir per branch:
+#   ~/code/myproject on branch feature/auth
+#     -> ~/code/myproject.worktrees/feature-auth
+worktree-path = "{{ repo_path }}/../{{ repo }}.worktrees/{{ branch | sanitize }}"
