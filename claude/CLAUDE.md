@@ -22,30 +22,59 @@ file) is **not used** — Jeff considers it a mistake; never create one.
 
 Feature worktrees are still fine where a repo uses them (e.g. the `lab` repos): the
 layout is a **standard repo with sibling `*.worktrees/` dirs** — keep the main checkout
-on `main` and add each worktree alongside it (`git worktree add ../<repo>.worktrees/<slug>`),
-never off a bare root.
+on `main` and add each worktree alongside it, never off a bare root.
 - Each worktree is an independent checkout of a branch.
 - `TASK.md` in a worktree/repo root (if present) describes what that checkout is
   currently focused on — read it before starting work.
+
+### Worktrunk (`wt`)
+
+Worktree operations go through [worktrunk](https://worktrunk.dev), not raw
+`git worktree`:
+
+```sh
+wt switch --create <slug>   # create branch + worktree, based on the default branch
+wt switch <slug>            # move to an existing worktree
+wt list                     # all worktrees, with dirty/ahead/behind status
+wt remove <slug>            # remove the worktree; delete the branch if merged
+```
+
+The `<repo>.worktrees/<branch>` layout comes from the `worktree-path` template in
+`~/.config/worktrunk/config.toml` (seeded from the dotfiles repo), so it is
+configured once rather than spelled out per command. Shell integration is loaded
+from `.bash_profile`, which is what lets `wt switch` change the shell's directory.
+
+If `wt` is not on PATH, fall back to the raw equivalents — `git worktree add
+../<repo>.worktrees/<slug> -b <slug>`, `git worktree remove <path>`, `git worktree
+list`. The layout is identical either way; only the branch-deletion safety below
+is lost.
 
 ## Git authority
 
 Claude may do these without asking:
 
-- create feature worktrees and branches
+- create feature worktrees and branches (`wt switch --create <slug>`)
 - commit on feature branches (amend only commits that haven't been pushed)
 - push feature branches (never push main; never use `--force`)
 - manage issues and PRs: `gh` for GitHub repos, `tea` for Forgejo-hosted repos
-- after Jeff merges a PR: remove that branch's worktree and delete the local
-  branch Claude created for it — and the remote branch too, if Claude created
-  it and the host didn't already auto-delete it — provided nothing outside the
-  repo depends on that checkout (each project's CLAUDE.md defines its own
-  checks)
+- after Jeff merges a PR: `wt remove <slug>` for the branch Claude created —
+  and the remote branch too, if Claude created it and the host didn't already
+  auto-delete it — provided nothing outside the repo depends on that checkout
+  (each project's CLAUDE.md defines its own checks)
+
+Plain `wt remove` stays on that list because it cannot violate the never-list
+below: it deletes the branch only when merging it would add nothing to the
+default branch, recognizing squash and rebase merges via patch-id and tree
+comparison, and it reports the evidence (`tree matches main`). On an unmerged
+branch it removes the worktree, keeps the branch, and prints the `-D` command
+rather than running it — that command is Jeff's to run, not Claude's.
 
 Claude must never do these itself — it hands Jeff the exact command instead:
 
-- commit anything to main, or merge any branch into main
-- delete any branch that is unmerged, or that Claude did not create
+- commit anything to main, or merge any branch into main — including `wt merge`,
+  which squashes, rebases, and fast-forwards the target in a single step
+- delete any branch that is unmerged, or that Claude did not create — including
+  `wt remove -D`, which force-deletes unmerged branches
 - rewrite pushed history — no rebase, amend, or reset of commits that are
   already on the remote
 - force-push anything
