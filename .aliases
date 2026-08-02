@@ -45,16 +45,6 @@ alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
-# `update` is a script now -- jwm-bin/bin/update, on PATH as ~/bin/update.
-#
-# It outgrew an alias: picking the right `brew upgrade` needs the host
-# predicates, and it had drifted from what `daily` does unattended -- daily ran
-# brew upgrade every morning and refreshed neither the completion nor the
-# shell-init cache. Both now call jwm_update_tools (~/.functions) for the shared
-# chore list, so there is one inventory instead of two that disagree.
-#
-# Nothing is defined here on purpose: an alias would shadow the script.
-
 # Canonical hex dump; some systems have this symlinked
 command -v hd > /dev/null || alias hd="hexdump -C"
 
