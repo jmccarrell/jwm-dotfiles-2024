@@ -149,6 +149,28 @@ function mark43_host_p {
 # a , b , c
 function join_by { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
+# yazi, leaving the shell in whatever directory you quit from.
+#
+# A child process cannot change its parent's cwd, so this is the only way to get
+# it: --cwd-file has yazi write the directory on exit, and the wrapper reads that
+# back and cd's here. Bare `yazi` still works and still leaves you where you
+# started.
+#
+# Named `y` because that is what yazi's own docs call it -- every tutorial and
+# doc page then matches this setup exactly.
+#
+# The cd is guarded on a non-empty value that differs from $PWD: yazi writes
+# nothing to the file when quit with Q rather than q, and an unguarded cd on an
+# empty string would land in $HOME.
+function y() {
+    local tmp cwd
+    tmp="$(mktemp -t "yazi-cwd.XXXXXX")" || return 1
+    yazi "$@" --cwd-file="$tmp"
+    IFS='' read -r -d '' cwd < "$tmp"
+    [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && builtin cd -- "$cwd"
+    rm -f -- "$tmp"
+}
+
 #
 # sync Jeffs repos to ease multi machine editing.
 #  shamelessly derived from http://doc.norang.ca/org-mode.html#git-sync

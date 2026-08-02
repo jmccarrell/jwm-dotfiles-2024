@@ -1,0 +1,19 @@
+# yazi keybindings — stowed to ~/.config/yazi/keymap.toml
+#
+# Empty on purpose. It exists so the first rebind is a one-line edit, rather than
+# a new file plus a justfile tripwire entry plus a README line.
+#
+# THE TRAP, for when something does get added here: a bare `keymap = [...]` under
+# a section REPLACES every default binding in that section — yazi keeps only what
+# is listed and the tool is effectively bricked. Use `prepend_keymap` (wins over
+# the defaults) or `append_keymap` (loses to them). TOML permits only one of the
+# two per section, never both.
+#
+# Sections: [mgr] [tasks] [spot] [pick] [input] [confirm] [cmp] [help]
+#
+# So the shape is:
+#
+#   [mgr]
+#   prepend_keymap = [
+#   	{ on = "!", run = 'shell "$SHELL" --block', desc = "Open a shell here" },
+#   ]

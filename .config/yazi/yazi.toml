@@ -1,0 +1,25 @@
+# yazi manager config — stowed to ~/.config/yazi/yazi.toml
+#
+# Deliberately near-empty. The opener below is the only setting there is a
+# reason for yet; everything else stays on yazi's defaults until actually using
+# it produces a complaint worth encoding.
+
+[opener]
+# `edit` is yazi's own name for "open this in a text editor". [opener] entries
+# are keyed by name, so redefining this key overrides that one entry and leaves
+# the rest of the table alone.
+#
+# The default is `${EDITOR:-vi} %s`, and EDITOR here is a bare `emacsclient`
+# (~/.exports) — which waits for C-x # and fails outright when no Emacs server
+# is running. `ec` (jwm-bin) is the wrapper that raises the GUI Emacs first.
+#
+# block = true matches yazi's default for this entry, and is what keeps failures
+# visible. `ec` runs `emacsclient -c`, which waits for the frame to close under
+# either setting, so detaching it would buy no concurrency — it would only
+# redirect stderr to nowhere and turn "can't find socket" into a silent no-op.
+#
+# %s expands to every selected path; spread = true is what lets more than one
+# through to a single invocation.
+edit = [
+	{ run = 'ec %s', block = true, spread = true, desc = "ec (GUI Emacs)", for = "unix" },
+]
