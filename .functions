@@ -149,19 +149,12 @@ function mark43_host_p {
 # a , b , c
 function join_by { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
-# yazi, leaving the shell in whatever directory you quit from.
+# yazi, leaving the shell in the directory you quit from. A child cannot cd its
+# parent, so yazi writes the directory to --cwd-file and this reads it back.
+# Bare `yazi` still works, and still leaves you where you started.
 #
-# A child process cannot change its parent's cwd, so this is the only way to get
-# it: --cwd-file has yazi write the directory on exit, and the wrapper reads that
-# back and cd's here. Bare `yazi` still works and still leaves you where you
-# started.
-#
-# Named `y` because that is what yazi's own docs call it -- every tutorial and
-# doc page then matches this setup exactly.
-#
-# The cd is guarded on a non-empty value that differs from $PWD: yazi writes
-# nothing to the file when quit with Q rather than q, and an unguarded cd on an
-# empty string would land in $HOME.
+# The cd is guarded: quitting with Q rather than q writes nothing, and an
+# unguarded `cd --` on an empty string goes to $HOME.
 function y() {
     local tmp cwd
     tmp="$(mktemp -t "yazi-cwd.XXXXXX")" || return 1

@@ -127,9 +127,8 @@ status:
     # Mark43 mac, nothing on the other. Folded to a symlink, conf.d would have to
     # live in the repo, which defeats the point of it being machine-local.
     #
-    # .config/yazi is the other one that bites rather than merely offends: `ya pkg
-    # add` downloads plugin and flavor SOURCE TREES into it. Folded, every package
-    # yazi ever installs lands in this repo.
+    # .config/yazi likewise: `ya pkg add` downloads plugin and flavor source trees
+    # into it, so folded, every package yazi installs lands in this repo.
     for d in .config .config/ghostty .config/direnv .config/worktrunk .config/mise .config/yazi; do
       t="{{home_dir}}/$d"
       if [ -L "$t" ]; then echo "✗ $d is a SYMLINK (folded!) — must be a real dir"; fail=1
