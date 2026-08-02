@@ -1,0 +1,28 @@
+# uv user configuration — https://docs.astral.sh/uv/reference/settings/
+
+# Trust the platform certificate store instead of the roots uv bundles.
+#
+# Mark43 macs run Zscaler, which MITMs objects.githubusercontent.com -- the host
+# serving python-build-standalone release tarballs. uv uses rustls with its own
+# bundled webpki roots and never consults the macOS keychain, so the `Zscaler
+# Root CA` sitting in the System keychain is invisible to it and every
+# interpreter download dies with `invalid peer certificate: UnknownIssuer`.
+#
+# The interception is narrow, which makes this easy to misdiagnose: github.com
+# (Sectigo) and pypi.org (GlobalSign) come through clean, so `uv pip` and `uv
+# add` work fine and only `uv python install` / `uv python upgrade` fail.
+#
+# Why here and not an env var: bin/daily (jwm-bin) sources only ~/.functions and
+# ~/.path, so an export in ~/.bash_profile -- where NODE_EXTRA_CA_CERTS lives --
+# is invisible to the launchd job that runs `uv python upgrade`. That is the same
+# trap jwm_cargo_path documents in .path. uv reads this file in every context:
+# interactive shell, launchd, agent.
+#
+# Not SSL_CERT_FILE: ~/ca-cert/ZscalerRootCertificate-2048-SHA256.crt holds a
+# single certificate, so pointing SSL_CERT_FILE at it would *replace* the trust
+# store rather than extend it, breaking the hosts Zscaler does not intercept.
+#
+# Safe to sync to both macs -- this names no file, it only says "use the platform
+# store", which is what git and curl already do. (The old spelling for this was
+# `native-tls`; uv still accepts it but warns.)
+system-certs = true

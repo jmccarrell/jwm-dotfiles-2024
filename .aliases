@@ -45,17 +45,7 @@ alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
-# Get macOS Software Updates, and update installed Ruby gems, Homebrew, npm, and their installed packages
-# jwm: no node / npm / gems
-# alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup; npm install npm -g; npm update -g; sudo gem update --system; sudo gem update; sudo gem cleanup'
-# jwm: no brew cleanup; gems seem bound to specific .so libs; and that causes too much pain.
-# alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup'
-# The two post-upgrade refreshes run last so they see the just-upgraded tools:
-# jwm_refresh_completions (.bash_profile) regenerates completion scripts, and
-# jwm_pyenv_link_homebrew_pythons (.path) re-links the brew pythons into
-# ~/.pyenv/versions. Neither runs at shell startup any more -- a brew upgrade is
-# the only thing that invalidates them, so this and `daily` are the triggers.
-alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; rustup update; jwm_refresh_completions; jwm_pyenv_link_homebrew_pythons'
+alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; uv python upgrade; rustup update; jwm_refresh_completions'
 
 # Canonical hex dump; some systems have this symlinked
 command -v hd > /dev/null || alias hd="hexdump -C"
