@@ -149,6 +149,21 @@ function mark43_host_p {
 # a , b , c
 function join_by { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
+# yazi, leaving the shell in the directory you quit from. A child cannot cd its
+# parent, so yazi writes the directory to --cwd-file and this reads it back.
+# Bare `yazi` still works, and still leaves you where you started.
+#
+# The cd is guarded: quitting with Q rather than q writes nothing, and an
+# unguarded `cd --` on an empty string goes to $HOME.
+function y() {
+    local tmp cwd
+    tmp="$(mktemp -t "yazi-cwd.XXXXXX")" || return 1
+    yazi "$@" --cwd-file="$tmp"
+    IFS='' read -r -d '' cwd < "$tmp"
+    [ -n "$cwd" ] && [ "$cwd" != "$PWD" ] && builtin cd -- "$cwd"
+    rm -f -- "$tmp"
+}
+
 #
 # sync Jeffs repos to ease multi machine editing.
 #  shamelessly derived from http://doc.norang.ca/org-mode.html#git-sync

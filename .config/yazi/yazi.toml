@@ -1,0 +1,13 @@
+# yazi manager config — stowed to ~/.config/yazi/yazi.toml
+# Only the opener is set; everything else stays on yazi's defaults.
+
+[opener]
+# EDITOR is a bare `emacsclient` (~/.exports), which waits for C-x # and fails
+# outright when no server is running. `ec` (jwm-bin) raises the GUI Emacs first.
+# [opener] is keyed by name, so this replaces only the `edit` entry.
+#
+# block = true because `ec` runs `emacsclient -c` and waits either way; orphan
+# would buy no concurrency and only detach stderr, hiding "can't find socket".
+edit = [
+	{ run = 'ec %s', block = true, spread = true, desc = "ec (GUI Emacs)", for = "unix" },
+]

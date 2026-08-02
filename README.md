@@ -15,6 +15,8 @@ symlinks in alongside them. A file's path in the repo is where its symlink lands
 .config/direnv/direnvrc        -> ~/.config/direnv/direnvrc
 .config/ghostty/config.ghostty -> ~/.config/ghostty/config.ghostty
 .config/worktrunk/config.toml  -> ~/.config/worktrunk/config.toml
+.config/yazi/yazi.toml         -> ~/.config/yazi/yazi.toml
+.config/yazi/keymap.toml       -> ~/.config/yazi/keymap.toml
 .bash_profile, .aliases, …     -> ~/…            (top-level $HOME dotfiles)
 claude/CLAUDE.md, …            -> ~/.claude/…    (separate `claude` package)
 ```
