@@ -19,11 +19,11 @@ function fs() {
     fi;
 }
 
-if command -v git 1>/dev/null 2>&1; then
-    function diff() {
-        git diff --no-index --color-words "$@";
-    }
-fi;
+# if command -v git 1>/dev/null 2>&1; then
+#     function diff() {
+#         git diff --no-index --color-words "$@";
+#     }
+# fi;
 
 
 # Compare original and gzipped file size
