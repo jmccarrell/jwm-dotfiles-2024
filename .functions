@@ -878,15 +878,6 @@ jwm_refresh_completions() {
     command -v just > /dev/null && just --completions bash              > "$d/just"
     command -v uv   > /dev/null && uv generate-shell-completion bash    > "$d/uv"
     command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
-
-    # mise's completions belong here, with the other tools that emit their own
-    # script -- not in JWM_SHELL_INIT_CMDS, where the asdf entry mise replaced
-    # sat. `asdf completion bash` was a completion parked in the shell-init table
-    # because asdf had no init to cache; mise has both, so they separate cleanly.
-    #
-    # The emitted script opens `if ! type -p usage`, mise's own graceful
-    # degradation for machines without the `usage` CLI. Both macs have it from brew
-    # (4.1.0), so completions work immediately and that branch never fires here.
     command -v mise > /dev/null && mise completion bash                 > "$d/mise"
 
     # Seam for tools that should not be named in a public repo: ~/.extra (which
