@@ -14,6 +14,38 @@ Primary: Python, Emacs Lisp, Shell/Bash
 - Emacs Lisp: functions and variables use the `jwm/` prefix; package management via `use-package`
 - Shell: prefer bash; POSIX-compatible where portability matters
 
+## Comments
+
+Comments are concise: state the constraint and the surprise, not the
+investigation. Timings, tool output, and A/B results argue for a change, so they
+belong in the commit message and PR body — read once — not in a comment, which is
+read every time someone touches the line.
+
+Block headers are rare: one may introduce a group of definitions that belong
+together, never a single definition, which gets a plain comment above it instead.
+Never pad a header's title with a rule of repeated punctuation:
+
+```
+# ------------------------------------------- shell-init cache -----
+# =========================================== shell-init cache =====
+```
+
+A header is plain comment lines — bare marker, title, bare marker — using the
+language's line-comment syntax (`#`, `//`, `;;`):
+
+```
+#
+# shell-init cache
+#
+```
+
+Emacs Lisp's `;;; file.el --- ...` header and footer are that language's own
+convention, not block headers; in a literate config the org heading already is
+the section header.
+
+This applies to code I write, in any repo; I don't convert existing comments
+unless asked.
+
 ## Git repos and worktrees
 
 Jeff's repos are **plain clones** — `git clone` into a standard tree and work at the
