@@ -62,10 +62,7 @@ fi;
 # than forking the tool per login shell; see the table there for what each one
 # runs and what it costs. Falls back to the live command if the cache is
 # unusable, so behaviour is unchanged either way.
-# mise replaces asdf. Note this is genuinely shell init now, where the asdf entry
-# it replaces was `asdf completion bash` -- a completion parked in the shell-init
-# table because asdf had no init to cache. mise's completions moved to
-# jwm_refresh_completions, where the rest of them live.
+
 command -v mise &> /dev/null && jwm_shell_init mise
 
 # Set up fzf key bindings and fuzzy completion
@@ -97,9 +94,6 @@ command -v zoxide &> /dev/null && jwm_shell_init zoxide
 # instead of reaching the binary -- so that lives in JWM_SHELL_INIT_CMDS.  The
 # emitted script registers its own lazy completion, so `wt` is deliberately
 # absent from jwm_refresh_completions below.
-#
-# This is the single most expensive init on this mac at 21.8ms, which is why it
-# is cached rather than eval'd per tab.
 command -v wt &> /dev/null && jwm_shell_init wt
 
 # jwm_refresh_completions now lives in ~/.functions, next to the shell-init
