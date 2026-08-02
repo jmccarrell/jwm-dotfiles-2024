@@ -62,7 +62,8 @@ fi;
 # than forking the tool per login shell; see the table there for what each one
 # runs and what it costs. Falls back to the live command if the cache is
 # unusable, so behaviour is unchanged either way.
-command -v asdf &> /dev/null && jwm_shell_init asdf
+
+command -v mise &> /dev/null && jwm_shell_init mise
 
 # Set up fzf key bindings and fuzzy completion
 command -v fzf &> /dev/null && jwm_shell_init fzf
@@ -83,13 +84,6 @@ command -v packer &> /dev/null && complete -C packer packer
 # tofu autocomplete
 command -v tofu &> /dev/null && complete -C /opt/homebrew/bin/tofu tofu
 
-# Only the export: asdf_shims() in ~/.path already put the shims on PATH, reading
-# the same ${ASDF_DATA_DIR:-$HOME/.asdf} default, so prepending here just produced
-# a duplicate entry.
-if command -v asdf > /dev/null; then
-    export ASDF_DATA_DIR=${HOME}/.asdf
-fi
-
 command -v starship &> /dev/null && jwm_shell_init starship
 command -v zoxide &> /dev/null && jwm_shell_init zoxide
 
@@ -100,9 +94,6 @@ command -v zoxide &> /dev/null && jwm_shell_init zoxide
 # instead of reaching the binary -- so that lives in JWM_SHELL_INIT_CMDS.  The
 # emitted script registers its own lazy completion, so `wt` is deliberately
 # absent from jwm_refresh_completions below.
-#
-# This is the single most expensive init on this mac at 21.8ms, which is why it
-# is cached rather than eval'd per tab.
 command -v wt &> /dev/null && jwm_shell_init wt
 
 # jwm_refresh_completions now lives in ~/.functions, next to the shell-init
@@ -110,8 +101,8 @@ command -v wt &> /dev/null && jwm_shell_init wt
 #
 # The bootstrap call stays here rather than moving with it. The function's
 # `command -v` probes run when it is called, not when it is defined, and this is
-# the first point in startup where ~/.cargo/env and the asdf/PATH setup above
-# have actually put rustup, ruff and friends on PATH.
+# the first point in startup where ~/.cargo/env and the PATH setup above have
+# actually put rustup, ruff, mise and friends on PATH.
 #
 # Bootstrap once on a fresh machine; afterwards refresh explicitly, via
 # `update` (jwm-bin) or by calling jwm_refresh_completions by hand.

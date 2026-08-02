@@ -97,11 +97,17 @@ function jwm_gcloud_sdk_path() {
     printf '\n'
 }
 
-# add the standard asdf path.
-function asdf_shims() {
-    asdf_shims="${ASDF_DATA_DIR:-$HOME/.asdf}/shims"
-    if [[ -e "${asdf_shims}" ]]; then
-        printf "%s\n" "$asdf_shims"
+# These shims are for everything that never sources ~/.bash_profile: the
+# `daily` launchd job, GUI apps, anything spawned outside a login shell.
+#
+# Keeping the slot also keeps this ahead of /opt/homebrew/bin, which matters on
+# the other mac: brew node is installed there and cannot be removed (gemini-cli
+# depends on it), so PATH order is the only thing stopping brew's node from
+# shadowing the mise-managed one.
+function mise_shims() {
+    local mise_shims="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims"
+    if [[ -e "${mise_shims}" ]]; then
+        printf "%s\n" "$mise_shims"
         return
     fi
     printf '\n'
@@ -158,7 +164,7 @@ function jwm_set_path() {
 
     for dir in \
         $(nix_path) \
-        $(asdf_shims) \
+        $(mise_shims) \
         $(jwm_home_paths) \
         $(mark43_paths) \
         $(jwm_go_bin_paths) \
