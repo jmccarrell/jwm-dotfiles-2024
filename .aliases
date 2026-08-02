@@ -45,25 +45,6 @@ alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
-# Get macOS Software Updates, and update installed Ruby gems, Homebrew, npm, and their installed packages
-# jwm: no node / npm / gems
-# alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup; npm install npm -g; npm update -g; sudo gem update --system; sudo gem update; sudo gem cleanup'
-# jwm: no brew cleanup; gems seem bound to specific .so libs; and that causes too much pain.
-# alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup'
-# The two post-upgrade refreshes run last so they see the just-upgraded tools:
-# jwm_refresh_completions (.bash_profile) regenerates completion scripts, and
-# `uv python upgrade` moves uv's managed interpreters to the newest patch in
-# their series. Neither runs at shell startup -- only an upgrade invalidates
-# them, so this and `daily` are the triggers.
-#
-# `uv python upgrade` inherited this slot from jwm_pyenv_link_homebrew_pythons
-# when pyenv was retired. uv owns `python`/`python3` out of ~/.local/bin now,
-# and nothing else advances those interpreters: `brew upgrade` only moves the
-# python@3.x that brew keeps for chart-testing and ollama, which is no longer
-# on PATH as anything you type. The ~/.local/bin entries point at the *series*
-# symlink rather than the patch dir, so a 3.14.6 -> 3.14.7 bump carries them
-# forward untouched. It will not cross a minor, though -- 3.14 -> 3.15 is a
-# deliberate `uv python install --default 3.15`, once a year.
 alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; uv python upgrade; rustup update; jwm_refresh_completions'
 
 # Canonical hex dump; some systems have this symlinked
