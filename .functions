@@ -748,8 +748,15 @@ gwt-rm() {
 #
 # Measured on this mac (mean of 5, `just profile-shell-startup` for context):
 #   wt        21.8ms    starship  10.4ms    direnv  4.5ms    fzf     3.6ms
-#   asdf       3.6ms    zoxide     2.7ms
-# ~47ms of a ~191ms interactive login shell, paid per terminal tab.
+#   mise      11.0ms    zoxide     2.7ms
+# ~54ms of a ~191ms interactive login shell, paid per terminal tab.
+#
+# mise took asdf's row and costs 3x what it did. The two figures are comparable:
+# re-measuring `asdf completion bash` the same way gives 3.3-4.3ms, matching the
+# 3.6ms it is replacing. `mise activate bash` does strictly more -- 3531 bytes of
+# hook installation, against asdf's completion script -- which argues for caching
+# it, not against adopting it. Uncached it would be the second most expensive
+# line in the whole profile.
 #
 # The tradeoff is staleness: a tool upgrade can change its init script while the
 # cached copy lingers. `jwm_refresh_shell_init` is wired into the `update` alias
@@ -779,7 +786,7 @@ declare -A JWM_SHELL_INIT_CMDS=(
     [zoxide]="zoxide init bash"
     [direnv]="direnv hook bash"
     [fzf]="fzf --bash"
-    [asdf]="asdf completion bash"
+    [mise]="mise activate bash"
     [wt]="command wt config shell init bash"
     [brewenv]='"$(jwm_brew_cmd)" shellenv'
 )
@@ -879,6 +886,16 @@ jwm_refresh_completions() {
     command -v uv   > /dev/null && uv generate-shell-completion bash    > "$d/uv"
     command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
 
+    # mise's completions belong here, with the other tools that emit their own
+    # script -- not in JWM_SHELL_INIT_CMDS, where the asdf entry mise replaced
+    # sat. `asdf completion bash` was a completion parked in the shell-init table
+    # because asdf had no init to cache; mise has both, so they separate cleanly.
+    #
+    # The emitted script starts `if ! type -p usage`, so it degrades to nothing
+    # useful without the `usage` CLI. Install it with `mise use -g usage` if TAB
+    # on mise subcommands ever matters.
+    command -v mise > /dev/null && mise completion bash                 > "$d/mise"
+
     # Seam for tools that should not be named in a public repo: ~/.extra (which
     # is untracked and machine-local) may define jwm_refresh_completions_extra
     # to write its own files into $d.
@@ -914,8 +931,8 @@ jwm_refresh_completions() {
 #   brew update/upgrade   first -- everything below except rustup is a formula
 #   uv python upgrade     uv is a brew formula, so it must follow brew upgrade
 #   rustup update         before the refreshes, which shell out to rustup
-#   refresh completions   invokes rustup, rg, just, uv, ruff
-#   refresh shell-init    invokes starship, zoxide, direnv, fzf, asdf, wt, brew
+#   refresh completions   invokes rustup, rg, just, uv, ruff, mise
+#   refresh shell-init    invokes starship, zoxide, direnv, fzf, mise, wt, brew
 #
 # Failure labels go onto UPDATE_FAILURES, which the caller resets and reads --
 # the same contract gs_* has with GS_FAILURES, so there is one pattern here

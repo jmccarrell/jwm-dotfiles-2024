@@ -1,0 +1,39 @@
+# mise global configuration — https://mise.jdx.dev/configuration.html
+#
+# Shared by both macs. Machine-specific tool versions do NOT belong here: mise
+# also reads ~/.config/mise/conf.d/*.toml and merges it per-key, so a tool only
+# one mac wants goes in an untracked file there. That seam exists because the two
+# macs genuinely differ -- this one runs terraform, the other has never had it and
+# uses brew opentofu instead.
+#
+# Note ~/.tool-versions, if present, OVERRIDES this file. mise says so out loud
+# ("node is defined in ~/.tool-versions which overrides the global config"), so
+# migrating off asdf means moving that file aside, not just adding this one.
+
+[settings]
+# uv owns python, as of #35. Without this, mise would claim the python entries in
+# .tool-versions files across ~/code -- 6 of them, pinning four different versions
+# -- and reintroduce a second python manager days after we removed the first.
+#
+# Those pins have always been inert: asdf never had a python plugin, so nothing
+# has read them in years. mise ships python as a core tool and would honour them
+# immediately, which is the whole reason this line is here rather than absent.
+#
+# Verified on the other mac against a reference config pinning 14 tools including
+# python 3.12.7: `mise ls --current` drops from 14 entries to 13, and the one that
+# disappears is python. Everything else still resolves.
+#
+# The 12 .python-version files are NOT affected either way -- idiomatic version
+# files are opt-in and off (idiomatic_version_file_enable_tools = []), confirmed
+# on both macs.
+disable_tools = ["python"]
+
+[tools]
+# `lts` rather than a pinned patch, matching the `nodejs lts` this replaces and
+# what mise's own asdf-migration script produces. mise resolves the alias at
+# install time and records the alias, not the resolution -- `mise use -g --pin`
+# is the flag if a frozen version is ever wanted instead.
+#
+# Shared deliberately: both macs want one node policy. terraform is the tool that
+# differs, and it lives in conf.d.
+node = "lts"
