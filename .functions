@@ -19,11 +19,11 @@ function fs() {
     fi;
 }
 
-if command -v git 1>/dev/null 2>&1; then
-    function diff() {
-        git diff --no-index --color-words "$@";
-    }
-fi;
+# if command -v git 1>/dev/null 2>&1; then
+#     function diff() {
+#         git diff --no-index --color-words "$@";
+#     }
+# fi;
 
 
 # Compare original and gzipped file size
@@ -641,12 +641,6 @@ gs_mark43_host() {
     local rc
 
     gs_mark43_notes || { GS_FAILURES+=(mark43_notes); status=1; }
-
-    # gs_mark43_repos separates its two failure modes by exit status, so they
-    # get separate labels: mark43_repos is a repo that needs attention,
-    # mark43_repos-zpa is only "authenticate to Zscaler and it will catch up".
-    # Both used to arrive as mark43_repos, which meant the notification could
-    # not tell a corrupt packfile from a workday that had not started yet.
     gs_mark43_repos
     rc=$?
     case "$rc" in
@@ -658,10 +652,6 @@ gs_mark43_host() {
     return "$status"
 }
 
-# Sync every repo that belongs on this machine. Runs all syncs even if some
-# fail; records the labels of any that failed in the global GS_FAILURES array
-# and returns non-zero if any did. Callers (interactive shell, the `daily`
-# launchd job) can read GS_FAILURES to report which repos need attention.
 gs_all() {
     local status=0
     GS_FAILURES=()
@@ -828,13 +818,6 @@ jwm_shell_init() {
 #   tool still in the table, binary gone   -> the rm -f before the probe covers it
 #   tool removed from the table entirely   -> nothing referenced its file again
 #
-# The second left asdf's 4388-byte init sitting in the cache dir after #36 dropped
-# it from JWM_SHELL_INIT_CMDS -- harmless, since nothing calls jwm_shell_init asdf
-# any more, but the comment here used to promise it could not happen. Hence the
-# prune, which is the same shape as the dangling-symlink reaping in
-# jwm-bin#10/#34 and the version-dir prune the retired pyenv bridge carried: a
-# refresh pass that only knows about what is still declared cannot clean up after
-# a declaration being deleted.
 jwm_refresh_shell_init() {
     local d="${JWM_SHELL_INIT_DIR}"
     local name=''
@@ -856,18 +839,6 @@ jwm_refresh_shell_init() {
     # Prune anything left that the table does not name. This directory is written
     # by nothing else, so a file that is not a key is a cache for a tool that used
     # to be one.
-    #
-    # Skipped when the table is empty rather than treated as "delete everything":
-    # an empty JWM_SHELL_INIT_CMDS means a partial source or a broken declare,
-    # which is a fault, not an instruction. The pyenv prune reasoned the same way
-    # about an empty live set, for the same reason.
-    #
-    # Deliberately NOT extended to the completions dir. jwm_refresh_completions has
-    # a machine-local seam -- ~/.extra may define jwm_refresh_completions_extra to
-    # write files this repo cannot know the names of -- and `daily` never sources
-    # ~/.extra. A prune there would delete those every morning and regenerate them
-    # only when `update` ran interactively. The shell-init table has no such seam,
-    # which is what makes pruning safe here and unsafe there.
     if (( ${#JWM_SHELL_INIT_CMDS[@]} > 0 )); then
         for f in "$d"/*; do
             [[ -f "$f" ]] || continue
@@ -918,57 +889,19 @@ jwm_refresh_completions() {
     command -v uv   > /dev/null && uv generate-shell-completion bash    > "$d/uv"
     command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
     command -v mise > /dev/null && mise completion bash                 > "$d/mise"
-
-    # Seam for tools that should not be named in a public repo: ~/.extra (which
-    # is untracked and machine-local) may define jwm_refresh_completions_extra
-    # to write its own files into $d.
-    #
-    # The seam is resolved when this function runs, not when it is defined, so
-    # it does not matter that ~/.bash_profile sources ~/.extra after
-    # ~/.functions. What does matter: `daily` never sources ~/.extra, so an
-    # unattended refresh writes the tracked completions only and leaves the
-    # machine-local ones as they were. bin/update sources ~/.extra precisely so
-    # the interactive path keeps doing the whole job.
-    if declare -F jwm_refresh_completions_extra > /dev/null; then
-        jwm_refresh_completions_extra "$d"
-    fi
+    command -v wiggum > /dev/null && _WIGGUM_COMPLETE=bash_source wiggum > "$d/wiggum"
 
     printf 'bash completions refreshed in %s\n' "$d"
 }
 
 # --------------------------------------------------------- update the tools -----
 # The chore list shared by `daily` (unattended, under launchd) and `bin/update`
-# (interactive) -- both in jwm-bin. It exists because those two had drifted:
-# `daily` ran brew upgrade every morning and refreshed neither cache, so the
-# shell-init and completion caches sat pointing at the previous versions' output
-# until someone typed `update` by hand. #32 traded a fork-per-shell for a
-# staleness window; this closes it.
-#
-# Everything here is safe unattended: no sudo, no prompt, no terminal needed.
-# The steps that do need a terminal -- softwareupdate on jeffs mac, the
-# quarantine strip on the Mark43 one -- live in bin/update instead. That split
-# is the gate: it is why `daily` cannot walk into a sudo password prompt launchd
-# has no way to answer, without needing a flag to say so.
-#
-# The order is a dependency chain, not taste:
-#   brew update/upgrade   first -- everything below except rustup is a formula
-#   uv python upgrade     uv is a brew formula, so it must follow brew upgrade
-#   rustup update         before the refreshes, which shell out to rustup
-#   refresh completions   invokes rustup, rg, just, uv, ruff, mise
-#   refresh shell-init    invokes starship, zoxide, direnv, fzf, mise, wt, brew
-#
-# Failure labels go onto UPDATE_FAILURES, which the caller resets and reads --
-# the same contract gs_* has with GS_FAILURES, so there is one pattern here
-# rather than two. Returns 1 if anything failed, for callers that only want a
-# yes/no.
+# (interactive) -- both in jwm-bin.
 jwm_update_tools() {
     local status=0
 
     brew update || { UPDATE_FAILURES+=(brew-update); status=1; }
 
-    # The branch is about which brew, not whose machine, so it is if/else rather
-    # than the two independent `if`s daily used to carry: a host that is neither
-    # still gets a sane upgrade instead of silently getting none.
     if mark43_host_p; then
         # Workbrew machine: casks are disallowed by the workspace policy
         # (/opt/workbrew/var/workbrew.env.json), and a cask upgrade is also the
