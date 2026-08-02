@@ -506,33 +506,66 @@ gs_tome() {
     git_sync "$(jwm_dir)/proj/tome/tome" origin
 }
 
-# Sync every repo. Runs all syncs even if some fail; records the labels of any
-# that failed in the global GS_ALL_FAILURES array and returns non-zero if any
-# did. Callers (interactive shell, the `daily` launchd job) can read
-# GS_ALL_FAILURES to report which repos need attention.
+# The repo groups below are split by which machine the repos live on, so that
+# callers can run just the group they want. Each group appends the labels of any
+# repos that failed to the global GS_FAILURES array and returns non-zero if any
+# did; none of them reset it, so a caller running several groups accumulates one
+# combined list. Reset GS_FAILURES=() before the first group -- gs_all and the
+# `daily` launchd job both do.
+#
+# The groups deliberately do NOT test jwm_host_p / mark43_host_p themselves:
+# the caller guards, which lets `daily` put other per-machine chores in the same
+# block as the sync. Calling a group on the wrong machine is harmless anyway --
+# git_sync skips a repo that isn't checked out.
+
+# repos that live on every machine
+gs_common() {
+    local status=0
+    gs_literate-emacs-d || { GS_FAILURES+=(literate-emacs-d); status=1; }
+    gs_dotfiles         || { GS_FAILURES+=(dotfiles);         status=1; }
+    gs_jwm_bin          || { GS_FAILURES+=(jwm_bin);          status=1; }
+    return "$status"
+}
+
+# personal repos that live only on jeffs mac
+gs_jwm_host() {
+    local status=0
+    gs_todo             || { GS_FAILURES+=(todo);             status=1; }
+    gs_notes            || { GS_FAILURES+=(notes);            status=1; }
+    gs_jwm_pdata_notes  || { GS_FAILURES+=(jwm_pdata_notes);  status=1; }
+    gs_ebooks           || { GS_FAILURES+=(ebooks);           status=1; }
+    gs_lab              || { GS_FAILURES+=(lab);              status=1; }
+    gs_tome             || { GS_FAILURES+=(tome);             status=1; }
+    return "$status"
+}
+
+# repos that live only on the mark43 laptop
+gs_mark43_host() {
+    local status=0
+    gs_mark43_notes || { GS_FAILURES+=(mark43_notes); status=1; }
+    gs_mark43_repos || { GS_FAILURES+=(mark43_repos); status=1; }
+    return "$status"
+}
+
+# Sync every repo that belongs on this machine. Runs all syncs even if some
+# fail; records the labels of any that failed in the global GS_FAILURES array
+# and returns non-zero if any did. Callers (interactive shell, the `daily`
+# launchd job) can read GS_FAILURES to report which repos need attention.
 gs_all() {
     local status=0
-    GS_ALL_FAILURES=()
+    GS_FAILURES=()
 
     # personal repos first that live only on jeffs mac
     if jwm_host_p; then
-        gs_todo             || { GS_ALL_FAILURES+=(todo);             status=1; }
-        gs_notes            || { GS_ALL_FAILURES+=(notes);            status=1; }
-        gs_jwm_pdata_notes  || { GS_ALL_FAILURES+=(jwm_pdata_notes);  status=1; }
-        gs_ebooks           || { GS_ALL_FAILURES+=(ebooks);           status=1; }
-        gs_lab              || { GS_ALL_FAILURES+=(lab);              status=1; }
-        gs_tome             || { GS_ALL_FAILURES+=(tome);             status=1; }
+        gs_jwm_host || status=1
     fi;
 
     # common repos everywhere
-    gs_literate-emacs-d || { GS_ALL_FAILURES+=(literate-emacs-d); status=1; }
-    gs_dotfiles         || { GS_ALL_FAILURES+=(dotfiles);         status=1; }
-    gs_jwm_bin          || { GS_ALL_FAILURES+=(jwm_bin);          status=1; }
+    gs_common || status=1
 
     # then mark43 repos
     if mark43_host_p; then
-        gs_mark43_notes || { GS_ALL_FAILURES+=(mark43_notes);     status=1; }
-        gs_mark43_repos || { GS_ALL_FAILURES+=(mark43_repos);     status=1; }
+        gs_mark43_host || status=1
     fi
 
     return "$status"

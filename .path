@@ -176,6 +176,18 @@ function mark43_paths() {
     printf "%s\n" "${mark43_paths[@]}"
 }
 
+# rust/cargo. ~/.bash_profile also sources ~/.cargo/env, but it does so only for
+# interactive shells -- so without this, a non-interactive consumer that sources
+# just .functions and .path (the `daily` launchd job) never sees rustup.
+function jwm_cargo_path() {
+    cargo_bin="${HOME}/.cargo/bin"
+    if [[ -e "${cargo_bin}" ]]; then
+        printf "%s\n" "$cargo_bin"
+        return
+    fi
+    printf '\n'
+}
+
 function jwm_set_path() {
     # create a standard simple path
     local -a std_paths=()
@@ -211,6 +223,7 @@ function jwm_set_path() {
         $(mark43_paths) \
         $(jwm_go_bin_paths) \
         $(jwm_gcloud_sdk_path) \
+        $(jwm_cargo_path) \
         ; do
         if [[ ${dedup[$dir]+_} ]]; then
             continue
