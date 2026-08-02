@@ -751,13 +751,6 @@ gwt-rm() {
 #   mise      11.0ms    zoxide     2.7ms
 # ~54ms of a ~191ms interactive login shell, paid per terminal tab.
 #
-# mise took asdf's row and costs 3x what it did. The two figures are comparable:
-# re-measuring `asdf completion bash` the same way gives 3.3-4.3ms, matching the
-# 3.6ms it is replacing. `mise activate bash` does strictly more -- 3531 bytes of
-# hook installation, against asdf's completion script -- which argues for caching
-# it, not against adopting it. Uncached it would be the second most expensive
-# line in the whole profile.
-#
 # The tradeoff is staleness: a tool upgrade can change its init script while the
 # cached copy lingers. `jwm_refresh_shell_init` is wired into the `update` alias
 # for the same reason jwm_refresh_completions is -- `brew upgrade` is the only
