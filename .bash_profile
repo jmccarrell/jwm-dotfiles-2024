@@ -56,14 +56,18 @@ elif [ -f /etc/bash_completion ]; then
     source /etc/bash_completion;
 fi;
 
-command -v asdf &> /dev/null && source <(asdf completion bash)
+# jwm_shell_init (~/.functions) sources a cached copy of each init script rather
+# than forking the tool per login shell; see the table there for what each one
+# runs and what it costs. Falls back to the live command if the cache is
+# unusable, so behaviour is unchanged either way.
+command -v asdf &> /dev/null && jwm_shell_init asdf
 
 # Set up fzf key bindings and fuzzy completion
-command -v fzf &> /dev/null && eval "$(fzf --bash)"
+command -v fzf &> /dev/null && jwm_shell_init fzf
 
 # set up direnv
 # cf: https://direnv.net/docs/hook.html
-command -v direnv &> /dev/null && eval "$(direnv hook bash)"
+command -v direnv &> /dev/null && jwm_shell_init direnv
 
 # add rust/cargo to path
 [[ -e ${HOME}/.cargo/env ]] && source ${HOME}/.cargo/env
@@ -84,16 +88,20 @@ if command -v asdf > /dev/null; then
     export ASDF_DATA_DIR=${HOME}/.asdf
 fi
 
-command -v starship &> /dev/null && eval "$(starship init bash)"
-command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
+command -v starship &> /dev/null && jwm_shell_init starship
+command -v zoxide &> /dev/null && jwm_shell_init zoxide
 
-# worktrunk (wt) git-worktree manager.  The eval defines a `wt` shell function
-# wrapping the binary; without it `wt switch` cannot change this shell's cwd.
-# `command wt` is required: on a re-source the function already exists and a
-# bare `wt` would recurse into it instead of reaching the binary.  The emitted
-# script registers its own lazy completion, so `wt` is deliberately absent from
-# jwm_refresh_completions below.
-command -v wt &> /dev/null && eval "$(command wt config shell init bash)"
+# worktrunk (wt) git-worktree manager.  The sourced script defines a `wt` shell
+# function wrapping the binary; without it `wt switch` cannot change this shell's
+# cwd.  `command wt` is still required when generating the script -- on a
+# re-source the function already exists and a bare `wt` would recurse into it
+# instead of reaching the binary -- so that lives in JWM_SHELL_INIT_CMDS.  The
+# emitted script registers its own lazy completion, so `wt` is deliberately
+# absent from jwm_refresh_completions below.
+#
+# This is the single most expensive init on this mac at 21.8ms, which is why it
+# is cached rather than eval'd per tab.
+command -v wt &> /dev/null && jwm_shell_init wt
 
 # Generate bash completions for CLI tools that emit their own script.
 # bash-completion@2 lazily sources $BASH_COMPLETION_USER_DIR/completions/<cmd>
