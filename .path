@@ -97,18 +97,8 @@ function jwm_gcloud_sdk_path() {
     printf '\n'
 }
 
-# add the mise shims dir, in the slot asdf_shims() used to hold.
-#
-# Interactive shells get `mise activate` instead, cached via jwm_shell_init in
-# ~/.bash_profile. Activation prepends the real install dirs and wins over these
-# shims -- verified rather than assumed: with both in play `mise doctor` reports
-# activated: yes and shims_on_path: yes without complaint, and `command -v
-# terraform` resolves to ~/.local/share/mise/installs/... not to a shim.
-#
-# So these shims are for everything that never sources ~/.bash_profile: the
-# `daily` launchd job, GUI apps, anything spawned outside a login shell. That is
-# coverage asdf's shims gave for free, and dropping it would have regressed
-# silently rather than visibly.
+# These shims are for everything that never sources ~/.bash_profile: the
+# `daily` launchd job, GUI apps, anything spawned outside a login shell.
 #
 # Keeping the slot also keeps this ahead of /opt/homebrew/bin, which matters on
 # the other mac: brew node is installed there and cannot be removed (gemini-cli
