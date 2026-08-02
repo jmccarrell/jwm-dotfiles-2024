@@ -640,6 +640,13 @@ JWM_SHELL_INIT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bash-shell-init"
 #
 # `command wt` is required, per the note in ~/.bash_profile: on a re-source the
 # wt function already exists, and a bare `wt` would recurse into it.
+#
+# brewenv is single-quoted so `$(jwm_brew_cmd)` is stored literally and resolved
+# when the script is generated -- jwm_brew_cmd stays the source of truth for
+# which brew, so the Workbrew prefix on the Mark43 mac and the Homebrew one
+# elsewhere each cache their own. Its output keeps the nested
+# `eval "$(path_helper -s)"`, which is what makes the cached copy still react to
+# the current PATH rather than freezing it.
 declare -A JWM_SHELL_INIT_CMDS=(
     [starship]="starship init bash --print-full-init"
     [zoxide]="zoxide init bash"
@@ -647,6 +654,14 @@ declare -A JWM_SHELL_INIT_CMDS=(
     [fzf]="fzf --bash"
     [asdf]="asdf completion bash"
     [wt]="command wt config shell init bash"
+    [brewenv]='"$(jwm_brew_cmd)" shellenv'
+)
+
+# How to tell whether a tool is present, for names where `command -v <name>` is
+# not the answer. brewenv is an artifact name rather than a command, and brew's
+# location is what jwm_brew_cmd exists to work out.
+declare -A JWM_SHELL_INIT_PROBE=(
+    [brewenv]="jwm_brew_cmd"
 )
 
 # Source the cached init for $1, generating it first if absent. Self-bootstraps,
@@ -689,7 +704,7 @@ jwm_refresh_shell_init() {
 
     for name in "${!JWM_SHELL_INIT_CMDS[@]}"; do
         rm -f "$d/$name"
-        command -v "${name}" > /dev/null 2>&1 || continue
+        eval "${JWM_SHELL_INIT_PROBE[$name]:-command -v $name}" > /dev/null 2>&1 || continue
         if ! eval "${JWM_SHELL_INIT_CMDS[$name]}" > "$d/$name" 2>/dev/null ||
                [[ ! -s "$d/$name" ]]; then
             rm -f "$d/$name"
