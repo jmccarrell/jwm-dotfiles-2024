@@ -820,12 +820,25 @@ jwm_shell_init() {
     source "$f"
 }
 
-# Regenerate every cached init script. Call after a toolchain upgrade; the
-# `update` alias does. Removing first means a tool that has since disappeared
-# stops being sourced, rather than lingering as a stale file forever.
+# Regenerate every cached init script. Call after a toolchain upgrade; `update`
+# (jwm-bin) does, via jwm_update_tools.
+#
+# Two kinds of staleness, and the loop below only ever handled the first:
+#
+#   tool still in the table, binary gone   -> the rm -f before the probe covers it
+#   tool removed from the table entirely   -> nothing referenced its file again
+#
+# The second left asdf's 4388-byte init sitting in the cache dir after #36 dropped
+# it from JWM_SHELL_INIT_CMDS -- harmless, since nothing calls jwm_shell_init asdf
+# any more, but the comment here used to promise it could not happen. Hence the
+# prune, which is the same shape as the dangling-symlink reaping in
+# jwm-bin#10/#34 and the version-dir prune the retired pyenv bridge carried: a
+# refresh pass that only knows about what is still declared cannot clean up after
+# a declaration being deleted.
 jwm_refresh_shell_init() {
     local d="${JWM_SHELL_INIT_DIR}"
     local name=''
+    local f=''
 
     mkdir -p "$d" || return 1
 
@@ -839,6 +852,32 @@ jwm_refresh_shell_init() {
                 "$name" >&2
         fi
     done
+
+    # Prune anything left that the table does not name. This directory is written
+    # by nothing else, so a file that is not a key is a cache for a tool that used
+    # to be one.
+    #
+    # Skipped when the table is empty rather than treated as "delete everything":
+    # an empty JWM_SHELL_INIT_CMDS means a partial source or a broken declare,
+    # which is a fault, not an instruction. The pyenv prune reasoned the same way
+    # about an empty live set, for the same reason.
+    #
+    # Deliberately NOT extended to the completions dir. jwm_refresh_completions has
+    # a machine-local seam -- ~/.extra may define jwm_refresh_completions_extra to
+    # write files this repo cannot know the names of -- and `daily` never sources
+    # ~/.extra. A prune there would delete those every morning and regenerate them
+    # only when `update` ran interactively. The shell-init table has no such seam,
+    # which is what makes pruning safe here and unsafe there.
+    if (( ${#JWM_SHELL_INIT_CMDS[@]} > 0 )); then
+        for f in "$d"/*; do
+            [[ -f "$f" ]] || continue
+            name="${f##*/}"
+            [[ ${JWM_SHELL_INIT_CMDS[$name]+_} ]] && continue
+            rm -f "$f" &&
+                printf 'jwm_refresh_shell_init: pruned %s, no longer in the table\n' \
+                    "$name" >&2
+        done
+    fi
 
     printf 'bash shell-init cache refreshed in %s\n' "$d"
 }
