@@ -390,6 +390,77 @@ git_mark43_remote_p() {
     return 1
 }
 
+# Of the mark43 remotes above, which reach their host only through the Zscaler
+# Private Access tunnel? Those hosts resolve to ZPA synthetic IPs in
+# 100.64.0.0/10 and stay unreachable until the day's Zscaler authentication has
+# happened -- a step only Jeff can take. That is a precondition, not a race, so
+# there is nothing a retry or a longer timeout can wait out; the sync has to
+# recognize the state and skip rather than report a broken repo.
+#
+# Deliberately a separate predicate from git_mark43_remote_p rather than a flag
+# on it: "is this ours?" and "can this be reached unattended?" are different
+# questions, and only the second one governs whether a sync can run.
+git_zpa_remote_p() {
+    local remote_url="$1"
+
+    case "$remote_url" in
+        git@github.internal-mark43.us:*|https://github.internal-mark43.us/*|ssh://git@github.internal-mark43.us/*)
+            return 0
+            ;;
+        git@github.internal-mark43-staging.us:*|https://github.internal-mark43-staging.us/*|ssh://git@github.internal-mark43-staging.us/*)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+# Host part of a git remote URL, for the reachability probe below. Handles the
+# three forms the case arms above accept: scp-style, https, and ssh://.
+git_remote_host() {
+    local remote_url="$1"
+
+    remote_url="${remote_url#ssh://}"
+    remote_url="${remote_url#https://}"
+    remote_url="${remote_url#http://}"
+    remote_url="${remote_url#*@}"
+    remote_url="${remote_url%%/*}"
+    printf "%s\n" "${remote_url%%:*}"
+}
+
+# Can we get as far as SSH auth against this host?
+#
+# A TCP probe is not enough, and this is the whole trap: with the tunnel down,
+# Zscaler still accepts the connection on its synthetic IP and only then hangs
+# up -- `Connection closed by 100.64.1.28 port 22`. So `nc -z` reports success
+# in exactly the broken state. The probe has to reach authentication.
+#
+# ssh reports its own transport and auth failures as 255, and otherwise passes
+# through the remote command's status; GitHub Enterprise answers a good auth
+# with the "does not provide shell access" banner and exits 1. So 255 is the
+# signal, and anything else means we got far enough to be talking to git.
+#
+# An unknown host key also lands here as 255 and is treated as unreachable.
+# That is the safe direction: skipping is recoverable, and StrictHostKeyChecking
+# is not something a background job should be relaxing on its own.
+#
+# `-n` is load-bearing, not tidiness. The only caller runs this inside a
+# `while IFS= read -r ... done < <(git_mark43_repo_paths)` loop, and ssh reads
+# stdin by default -- so without it the probe swallows the rest of the repo
+# list, and the loop silently stops at the first ZPA repo it meets. That failure
+# is invisible in unit tests with a stubbed probe: it needs a real ssh to
+# reproduce, and it looks like "some repos just did not sync" rather than an
+# error.
+git_ssh_host_reachable_p() {
+    local host="$1"
+    local rc
+
+    ssh -n -o BatchMode=yes -o ConnectTimeout=5 -T "git@${host}" > /dev/null 2>&1
+    rc=$?
+
+    (( rc != 255 ))
+}
+
 git_repo_toplevel_p() {
     local git_path="$1"
     local repo_path toplevel_path
@@ -466,17 +537,58 @@ gs_mark43_notes() {
     git_sync "${HOME}/mark43/notes" origin
 }
 
+# Sync every mark43 repo under ~/code, skipping the ZPA-only ones when the
+# tunnel is not up.
+#
+# Exit status distinguishes the two outcomes, because they want different
+# responses: 1 means a repo genuinely failed to sync and needs looking at, 2
+# means only that some repos were skipped pending Zscaler authentication. A real
+# failure wins if both happen -- it is the one that does not fix itself by
+# starting the workday.
+#
+# Reachability is probed once per host and cached, so a down tunnel costs one
+# 5-second timeout rather than one per repo.
 gs_mark43_repos() {
-    local git_path status
+    local git_path remote_url host status zpa_skipped
+    local -A host_reachable=()
 
     status=0
+    zpa_skipped=0
     while IFS= read -r git_path
     do
+        remote_url=$(git -C "$git_path" remote get-url origin 2>/dev/null)
+
+        if [[ -n "$remote_url" ]] && git_zpa_remote_p "$remote_url"; then
+            host=$(git_remote_host "$remote_url")
+
+            if [[ -n "$host" ]]; then
+                if [[ -z ${host_reachable["$host"]+_} ]]; then
+                    if git_ssh_host_reachable_p "$host"; then
+                        host_reachable["$host"]=1
+                    else
+                        host_reachable["$host"]=0
+                    fi
+                fi
+
+                if (( host_reachable["$host"] == 0 )); then
+                    git_sync_log_msg "skipping $git_path: $host unreachable, Zscaler not authenticated yet"
+                    zpa_skipped=1
+                    continue
+                fi
+            fi
+        fi
+
         git_sync_log_msg "Syncing $git_path"
         git_sync_pull_only "$git_path" origin || status=1
     done < <(git_mark43_repo_paths)
 
-    return "$status"
+    if (( status )); then
+        return 1
+    fi
+    if (( zpa_skipped )); then
+        return 2
+    fi
+    return 0
 }
 
 gs_lab() {
@@ -526,8 +638,23 @@ gs_jwm_host() {
 # repos that live only on the mark43 laptop
 gs_mark43_host() {
     local status=0
+    local rc
+
     gs_mark43_notes || { GS_FAILURES+=(mark43_notes); status=1; }
-    gs_mark43_repos || { GS_FAILURES+=(mark43_repos); status=1; }
+
+    # gs_mark43_repos separates its two failure modes by exit status, so they
+    # get separate labels: mark43_repos is a repo that needs attention,
+    # mark43_repos-zpa is only "authenticate to Zscaler and it will catch up".
+    # Both used to arrive as mark43_repos, which meant the notification could
+    # not tell a corrupt packfile from a workday that had not started yet.
+    gs_mark43_repos
+    rc=$?
+    case "$rc" in
+        0) ;;
+        2) GS_FAILURES+=(mark43_repos-zpa); status=1 ;;
+        *) GS_FAILURES+=(mark43_repos);     status=1 ;;
+    esac
+
     return "$status"
 }
 
