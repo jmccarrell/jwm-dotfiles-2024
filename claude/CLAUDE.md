@@ -79,6 +79,15 @@ Claude must never do these itself — it hands Jeff the exact command instead:
   already on the remote
 - force-push anything
 - add, remove, or repoint git remotes, or change repo settings
+- skip a configured worktrunk hook with `--no-hooks`. Project hooks are safety
+  gates a repo deliberately installed (e.g. `literate-emacs.d`'s `pre-remove`
+  guard on the `~/.emacs.d/init.el` symlink); `--no-hooks` disables exactly the
+  check that is refusing. When a hook blocks, satisfy it or report it.
+- approve a project hook with `-y`/`--yes` to get past `Cannot prompt for
+  approval in non-interactive environment`. Approval is Jeff's review of a
+  command stored in a tracked config file, which may have arrived via `git
+  pull`; Claude reports the missing approval so Jeff can run
+  `wt config approvals add` himself.
 
 Main checkouts are read-only for Claude, file edits included — all work, code
 and docs, lands via feature worktree + PR.
