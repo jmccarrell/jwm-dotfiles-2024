@@ -150,22 +150,6 @@ function mark43_host_p {
 function join_by { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
 #
-# select the JVM version in use
-#
-# see all versions with -V/--verbose
-#  set a version with -v/--version
-#  cf: https://www.kevinhooke.com/2017/10/05/switching-java-versions-on-mac-os/
-function jwm_prefer_java_8 {
-    jh=$(/usr/libexec/java_home --version 1.8)
-    export JAVA_HOME="$jh"
-}
-
-function jwm_prefer_java_11 {
-    jh=$(/usr/libexec/java_home --version 11)
-    export JAVA_HOME="$jh"
-}
-
-#
 # sync Jeffs repos to ease multi machine editing.
 #  shamelessly derived from http://doc.norang.ca/org-mode.html#git-sync
 #

@@ -13,7 +13,6 @@ symlinks in alongside them. A file's path in the repo is where its symlink lands
 # the seed set — everything this repo installs
 .config/starship.toml          -> ~/.config/starship.toml
 .config/direnv/direnvrc        -> ~/.config/direnv/direnvrc
-.config/kitty/*                -> ~/.config/kitty/*
 .config/ghostty/config.ghostty -> ~/.config/ghostty/config.ghostty
 .config/worktrunk/config.toml  -> ~/.config/worktrunk/config.toml
 .bash_profile, .aliases, …     -> ~/…            (top-level $HOME dotfiles)
@@ -35,11 +34,12 @@ directory symlink and capture another program's writes.
 
 Guarantees, and the flags that provide them (see `justfile`):
 
-- **`--no-folding`** → managed subdirs (`kitty/`, `ghostty/`, `direnv/`, `worktrunk/`) and `~/.config`
+- **`--no-folding`** → managed subdirs (`ghostty/`, `direnv/`, `worktrunk/`) and `~/.config`
   itself stay **real directories** with per-file symlinks inside. Stow never collapses
-  one into a single directory symlink. This is what lets other programs — and kitty's
-  own runtime files (`session-*.bash`, `*.bak`, gitignored) — keep writing into
-  `~/.config/*` without touching the repo.
+  one into a single directory symlink. This matters most for a lightly-populated managed
+  dir: fold one into a symlink and every file the owning app later writes there — caches,
+  backups, session state — lands in this repo instead of `~/.config`. `just status`
+  enforces it as a tripwire.
 - **no `--adopt`** → an existing target file is never sucked into the repo (adoption is
   a one-off import tool; run it by hand deliberately if you ever need it, never in a
   routine install).

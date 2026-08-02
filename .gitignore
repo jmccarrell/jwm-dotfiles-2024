@@ -1,5 +1,2 @@
 .gitconfig.machine
 .gitconfig.personal
-.config/kitty/kitty.conf.bak
-.config/kitty/kitty.conf.*.bak
-.config/kitty/session-*.bash
