@@ -52,10 +52,19 @@ alias egrep='egrep --color=auto'
 # alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup'
 # The two post-upgrade refreshes run last so they see the just-upgraded tools:
 # jwm_refresh_completions (.bash_profile) regenerates completion scripts, and
-# jwm_pyenv_link_homebrew_pythons (.path) re-links the brew pythons into
-# ~/.pyenv/versions. Neither runs at shell startup any more -- a brew upgrade is
-# the only thing that invalidates them, so this and `daily` are the triggers.
-alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; rustup update; jwm_refresh_completions; jwm_pyenv_link_homebrew_pythons'
+# `uv python upgrade` moves uv's managed interpreters to the newest patch in
+# their series. Neither runs at shell startup -- only an upgrade invalidates
+# them, so this and `daily` are the triggers.
+#
+# `uv python upgrade` inherited this slot from jwm_pyenv_link_homebrew_pythons
+# when pyenv was retired. uv owns `python`/`python3` out of ~/.local/bin now,
+# and nothing else advances those interpreters: `brew upgrade` only moves the
+# python@3.x that brew keeps for chart-testing and ollama, which is no longer
+# on PATH as anything you type. The ~/.local/bin entries point at the *series*
+# symlink rather than the patch dir, so a 3.14.6 -> 3.14.7 bump carries them
+# forward untouched. It will not cross a minor, though -- 3.14 -> 3.15 is a
+# deliberate `uv python install --default 3.15`, once a year.
+alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; rustup update; jwm_refresh_completions; uv python upgrade'
 
 # Canonical hex dump; some systems have this symlinked
 command -v hd > /dev/null || alias hd="hexdump -C"
