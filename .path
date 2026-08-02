@@ -149,7 +149,10 @@ function jwm_pyenv_link_homebrew_pythons() {
     local marker='.jwm-homebrew-python'
     local -a live_versions=()
     local -A live=()
+    local -A pinned=()
     local version_dir=''
+    local version_name=''
+    local line=''
 
     if ! command -v pyenv > /dev/null 2>&1; then
         return 0
@@ -175,11 +178,37 @@ function jwm_pyenv_link_homebrew_pythons() {
     # has no marker and is never touched. An empty live set means the register
     # pass found nothing, which is a fault rather than a signal to delete -- so
     # skip the prune entirely rather than wipe every brew-linked version.
+    #
+    # The global pin is also off limits. A pin at a brew-linked patch version --
+    # say 3.14.5, after brew has moved to 3.14.6 -- is exactly the kind of dir
+    # this prune targets, but deleting it breaks pyenv permanently and quietly:
+    # `pyenv version`, `versions` and `prefix` then error on every call with
+    # ``version `3.14.5' is not installed``, while `python3` keeps working
+    # because the shim falls through to the `system` interpreter. So keep it and
+    # say why. Moving the pin is Jeff's call, not this function's -- rewriting
+    # ~/.pyenv/version from a launchd job would be worse than the stale dir.
     if (( ${#live_versions[@]} > 0 )); then
         for prefix in "${live_versions[@]}"; do live["$prefix"]=1; done
+
+        # `|| [[ -n "$line" ]]` so a file with no trailing newline still yields
+        # its last line. pyenv allows several versions here, hence the loop.
+        if [[ -r "$pyenv_root/version" ]]; then
+            while read -r line || [[ -n "$line" ]]; do
+                [[ -n "$line" ]] && pinned["$line"]=1
+            done < "$pyenv_root/version"
+        fi
+
         for version_dir in "$pyenv_root"/versions/*; do
             [[ -d "$version_dir" && -f "$version_dir/$marker" ]] || continue
-            [[ ${live["${version_dir##*/}"]+_} ]] && continue
+            version_name="${version_dir##*/}"
+            [[ ${live["$version_name"]+_} ]] && continue
+            if [[ ${pinned["$version_name"]+_} ]]; then
+                printf '%s: keeping %s: pinned in %s, but no longer a Homebrew python.\n%s\n' \
+                    'jwm_pyenv_link_homebrew_pythons' "$version_name" \
+                    "$pyenv_root/version" \
+                    '  Repoint the pin (e.g. `pyenv global system`) to let it be pruned.' >&2
+                continue
+            fi
             rm -rf "$version_dir"
         done
     fi
@@ -211,14 +240,24 @@ function asdf_shims() {
 
 # add the pyenv shims dir, the way asdf_shims does for asdf.
 #
-# This replaces `eval "$(pyenv init -)"`, which cost ~0.14s per login shell --
-# 0.09s of that a `pyenv rehash` on every single tab. Putting the shims on PATH
-# is the only part of `pyenv init` that matters here: shim resolution of
-# `.python-version` works without it (verified against ~/code/tf-live-us, which
-# pins 3.8.20). What is given up is `pyenv shell`, pyenv's own tab-completion,
-# PYENV_SHELL, and the auto-rehash -- all of which are about driving pyenv
-# interactively. Run `eval "$(pyenv init - bash)"` by hand in a shell that needs
-# them.
+# This replaces BOTH `eval "$(pyenv init -)"` and `eval "$(pyenv virtualenv-init
+# -)"`, which together cost ~0.14s on this mac and ~0.33s on the other. Putting
+# the shims on PATH is the only part of either that matters here: shim
+# resolution of `.python-version` works without them, verified against both
+# ~/code/tf-live-us (pins 3.8.20) and ~/jwm/proj/effective-pandas-book (3.12).
+#
+# Given up from `pyenv init -`: `pyenv shell`, pyenv's own tab-completion,
+# PYENV_SHELL, and the per-shell auto-rehash. Losing the rehash is a small win
+# beyond the 0.09s -- it silently rewrites all ~45 shims whenever PYENV_ROOT is
+# wrong, which is easy to do from a test harness.
+#
+# Given up from `pyenv virtualenv-init -`: the _pyenv_virtualenv_hook that
+# auto-activates a virtualenv on cd, PYENV_VIRTUALENV_INIT, and the
+# pyenv-virtualenv shims dir. Safe because `pyenv virtualenvs` is empty on both
+# macs -- if that changes, this is the line to restore.
+#
+# All of it is about driving pyenv interactively. Run `eval "$(pyenv init -
+# bash)"` by hand in a shell that needs it.
 function pyenv_shims() {
     local pyenv_shims="${PYENV_ROOT:-$HOME/.pyenv}/shims"
     if [[ -e "${pyenv_shims}" ]]; then
@@ -262,10 +301,11 @@ function jwm_set_path() {
     brew_cmd=$(jwm_brew_cmd 2>/dev/null)
     if [[ -n "$brew_cmd" ]]; then eval "$("$brew_cmd" shellenv)"; fi
 
-    # pyenv gets its shims dir prepended below, via pyenv_shims. Neither
-    # `pyenv init -` nor jwm_pyenv_link_homebrew_pythons runs here any more --
-    # together they were 0.86s of a 1.40s login shell. See those functions for
-    # what moved where.
+    # pyenv gets its shims dir prepended below, via pyenv_shims. None of
+    # `pyenv init -`, `pyenv virtualenv-init -`, or
+    # jwm_pyenv_link_homebrew_pythons runs here any more -- together they were
+    # 0.86s of a 1.40s login shell on this mac, 1.07s of 1.22s on the other. See
+    # those functions for what moved where.
 
     # then prepend my preferred paths
     # first, remove any duplicate path elements
