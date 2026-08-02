@@ -149,10 +149,15 @@ function jwm_pyenv_link_homebrew_pythons() {
     local marker='.jwm-homebrew-python'
     local -a live_versions=()
     local -A live=()
-    local -A pinned=()
     local version_dir=''
     local version_name=''
     local line=''
+    local pin_file="$pyenv_root/version"
+    local -a pins=()
+    local -a new_pins=()
+    local pin='' series='' best='' v='' patch=''
+    local best_patch=-1
+    local pins_moved=0
 
     if ! command -v pyenv > /dev/null 2>&1; then
         return 0
@@ -179,36 +184,82 @@ function jwm_pyenv_link_homebrew_pythons() {
     # pass found nothing, which is a fault rather than a signal to delete -- so
     # skip the prune entirely rather than wipe every brew-linked version.
     #
-    # The global pin is also off limits. A pin at a brew-linked patch version --
-    # say 3.14.5, after brew has moved to 3.14.6 -- is exactly the kind of dir
-    # this prune targets, but deleting it breaks pyenv permanently and quietly:
+    # Before pruning, carry the global pin forward. A pin naming a brew-linked
+    # patch version -- 3.14.5, once brew has moved to 3.14.6 -- is exactly what
+    # this prune targets, and deleting it breaks pyenv permanently and quietly:
     # `pyenv version`, `versions` and `prefix` then error on every call with
-    # ``version `3.14.5' is not installed``, while `python3` keeps working
-    # because the shim falls through to the `system` interpreter. So keep it and
-    # say why. Moving the pin is Jeff's call, not this function's -- rewriting
-    # ~/.pyenv/version from a launchd job would be worse than the stale dir.
+    # ``version `3.14.5' is not installed``, while `python3` keeps working,
+    # because the shim falls through to the `system` interpreter. So move the pin
+    # to the head of its own series instead -- a 3.13 pin follows 3.13 rather
+    # than jumping to whatever is newest.
+    #
+    # Only a pin that is itself one of our marker dirs is ever rewritten. A real
+    # `pyenv install` build carries no marker, is never pruned, and so is never
+    # repointed either; nor is `system`, nor a short-form pin like 3.14, which
+    # every run re-registers and which therefore stays live on its own.
     if (( ${#live_versions[@]} > 0 )); then
         for prefix in "${live_versions[@]}"; do live["$prefix"]=1; done
 
         # `|| [[ -n "$line" ]]` so a file with no trailing newline still yields
-        # its last line. pyenv allows several versions here, hence the loop.
-        if [[ -r "$pyenv_root/version" ]]; then
+        # its last line -- `read` reports failure at EOF but has already set the
+        # variable, so a bare `read ... || pin=''` would silently drop the pin and
+        # prune the dir out from under it. pyenv allows several versions in this
+        # file, hence the loop and the rewrite preserving order.
+        if [[ -r "$pin_file" ]]; then
             while read -r line || [[ -n "$line" ]]; do
-                [[ -n "$line" ]] && pinned["$line"]=1
-            done < "$pyenv_root/version"
+                [[ -n "$line" ]] && pins+=( "$line" )
+            done < "$pin_file"
+        fi
+
+        for pin in "${pins[@]}"; do
+            # leave alone unless it is a stale dir of ours
+            if [[ ${live["$pin"]+_} || ! -f "$pyenv_root/versions/$pin/$marker" ]]; then
+                new_pins+=( "$pin" )
+                continue
+            fi
+
+            # highest live patch in the pin's own series, compared numerically
+            # rather than taken as "last match" -- iteration order of
+            # live_versions is glob order, which is not version order.
+            series="${pin%.*}"
+            best=''
+            best_patch=-1
+            for v in "${live_versions[@]}"; do
+                [[ "$v" == "$series".* ]] || continue
+                patch="${v##*.}"
+                [[ "$patch" =~ ^[0-9]+$ ]] || continue
+                if (( patch > best_patch )); then
+                    best_patch=$patch
+                    best="$v"
+                fi
+            done
+
+            if [[ -n "$best" ]]; then
+                printf '%s: moving pin %s -> %s in %s\n' \
+                    'jwm_pyenv_link_homebrew_pythons' "$pin" "$best" "$pin_file" >&2
+                new_pins+=( "$best" )
+                pins_moved=1
+            else
+                # Nothing live in that series: brew dropped the formula, or the
+                # register pass failed for it. Repointing would be guessing at a
+                # version, so keep the pinned dir rather than strand the pin on
+                # something that is not installed.
+                printf '%s: keeping %s: pinned in %s, but no longer a Homebrew python and nothing live in %s.x\n' \
+                    'jwm_pyenv_link_homebrew_pythons' "$pin" "$pin_file" "$series" >&2
+                new_pins+=( "$pin" )
+                live["$pin"]=1
+            fi
+        done
+
+        # only touch the file if something actually moved
+        if (( pins_moved )); then
+            printf '%s\n' "${new_pins[@]}" > "$pin_file"
         fi
 
         for version_dir in "$pyenv_root"/versions/*; do
             [[ -d "$version_dir" && -f "$version_dir/$marker" ]] || continue
             version_name="${version_dir##*/}"
             [[ ${live["$version_name"]+_} ]] && continue
-            if [[ ${pinned["$version_name"]+_} ]]; then
-                printf '%s: keeping %s: pinned in %s, but no longer a Homebrew python.\n%s\n' \
-                    'jwm_pyenv_link_homebrew_pythons' "$version_name" \
-                    "$pyenv_root/version" \
-                    '  Repoint the pin (e.g. `pyenv global system`) to let it be pruned.' >&2
-                continue
-            fi
             rm -rf "$version_dir"
         done
     fi
