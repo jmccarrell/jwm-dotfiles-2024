@@ -50,9 +50,12 @@ alias egrep='egrep --color=auto'
 # alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup; npm install npm -g; npm update -g; sudo gem update --system; sudo gem update; sudo gem cleanup'
 # jwm: no brew cleanup; gems seem bound to specific .so libs; and that causes too much pain.
 # alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup'
-# jwm_refresh_completions (defined in .bash_profile) runs last so regenerated
-# completion scripts match the just-upgraded tool versions.
-alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; rustup update; jwm_refresh_completions'
+# The two post-upgrade refreshes run last so they see the just-upgraded tools:
+# jwm_refresh_completions (.bash_profile) regenerates completion scripts, and
+# jwm_pyenv_link_homebrew_pythons (.path) re-links the brew pythons into
+# ~/.pyenv/versions. Neither runs at shell startup any more -- a brew upgrade is
+# the only thing that invalidates them, so this and `daily` are the triggers.
+alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; rustup update; jwm_refresh_completions; jwm_pyenv_link_homebrew_pythons'
 
 # Canonical hex dump; some systems have this symlinked
 command -v hd > /dev/null || alias hd="hexdump -C"
@@ -138,12 +141,11 @@ if command -v kubens > /dev/null; then
 fi
 
 if command -v kubectl-argo-rollouts > /dev/null; then
-    # jwm: well this doesn't provide the completions I expect
-    # but move on for now...
-    # shellcheck source=/dev/null
-    source <(kubectl-argo-rollouts completion bash)
+    # The completion is gone, not lazy-loaded: generating it cost 0.04s on every
+    # login shell, and by my own earlier note it never gave the completions I
+    # expected anyway. bash-completion@2 keys its lazy load on the typed command
+    # name, so a `kar` completion would need a hand-written shim file regardless.
     alias kar='kubectl-argo-rollouts'
-    complete -F __start_kubectl-argo-rollouts kar
 fi
 
 # k9s aliases
