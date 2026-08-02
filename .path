@@ -83,9 +83,13 @@ function jwm_brew_cmd() {
     return 1
 }
 
+# Internal helper for jwm_pyenv_link_homebrew_pythons; not meant to be called by
+# hand. $3 is the NAME of a caller array, appended with every version dir this
+# registers, so the caller can prune the ones it did not touch.
 function jwm_pyenv_register_homebrew_python_prefix() {
     local pyenv_root="$1"
     local prefix="$2"
+    local -n _registered="$3"
     local marker='.jwm-homebrew-python'
     local pybin=''
     local short_version=''
@@ -111,6 +115,7 @@ function jwm_pyenv_register_homebrew_python_prefix() {
 
         mkdir -p "$version_dir/bin" || continue
         printf "%s\n" "$prefix" > "$version_dir/$marker"
+        _registered+=( "$version_name" )
 
         for bindir in "$prefix/bin" "$prefix/libexec/bin"; do
             if [[ ! -d "$bindir" ]]; then
@@ -125,12 +130,34 @@ function jwm_pyenv_register_homebrew_python_prefix() {
     done
 }
 
+# Make Homebrew-managed Python versions visible to pyenv, by symlinking each brew
+# python prefix into ~/.pyenv/versions/<version>.
+#
+# Deliberately NOT called from ~/.bash_profile: the pass costs ~0.7s (a `python3
+# -c` version probe per prefix plus a few hundred `ln` calls), and on macOS every
+# terminal tab is a login shell, so running it here billed a once-a-day chore to
+# every new tab. A new brew python is the only thing that invalidates the links,
+# so the callers are the two places one can arrive: the `daily` LaunchAgent and
+# the interactive `update` alias.
 function jwm_pyenv_link_homebrew_pythons() {
     local brew_cmd=''
     local brew_prefix=''
     local pyenv_root="${PYENV_ROOT:-$HOME/.pyenv}"
     local prefix=''
     local nullglob_was_set=0
+    # must match the marker in jwm_pyenv_register_homebrew_python_prefix above
+    local marker='.jwm-homebrew-python'
+    local -a live_versions=()
+    local -A live=()
+    local version_dir=''
+    local version_name=''
+    local line=''
+    local pin_file="$pyenv_root/version"
+    local -a pins=()
+    local -a new_pins=()
+    local pin='' series='' best='' v='' patch=''
+    local best_patch=-1
+    local pins_moved=0
 
     if ! command -v pyenv > /dev/null 2>&1; then
         return 0
@@ -143,8 +170,100 @@ function jwm_pyenv_link_homebrew_pythons() {
     shopt -q nullglob && nullglob_was_set=1
     shopt -s nullglob
     for prefix in "$brew_prefix"/opt/python "$brew_prefix"/opt/python@*; do
-        jwm_pyenv_register_homebrew_python_prefix "$pyenv_root" "$prefix"
+        jwm_pyenv_register_homebrew_python_prefix "$pyenv_root" "$prefix" live_versions
     done
+
+    # Prune the version dirs a previous run created that this one did not. Every
+    # brew python patch bump registers a new <patch> dir and abandons the old
+    # one, so without this they accumulate one per upgrade -- and each is a full
+    # symlink farm pointing at whatever the prefix resolves to *now*, which makes
+    # the version number in its name a lie.
+    #
+    # Only dirs carrying our marker are eligible: a real `pyenv install` build
+    # has no marker and is never touched. An empty live set means the register
+    # pass found nothing, which is a fault rather than a signal to delete -- so
+    # skip the prune entirely rather than wipe every brew-linked version.
+    #
+    # Before pruning, carry the global pin forward. A pin naming a brew-linked
+    # patch version -- 3.14.5, once brew has moved to 3.14.6 -- is exactly what
+    # this prune targets, and deleting it breaks pyenv permanently and quietly:
+    # `pyenv version`, `versions` and `prefix` then error on every call with
+    # ``version `3.14.5' is not installed``, while `python3` keeps working,
+    # because the shim falls through to the `system` interpreter. So move the pin
+    # to the head of its own series instead -- a 3.13 pin follows 3.13 rather
+    # than jumping to whatever is newest.
+    #
+    # Only a pin that is itself one of our marker dirs is ever rewritten. A real
+    # `pyenv install` build carries no marker, is never pruned, and so is never
+    # repointed either; nor is `system`, nor a short-form pin like 3.14, which
+    # every run re-registers and which therefore stays live on its own.
+    if (( ${#live_versions[@]} > 0 )); then
+        for prefix in "${live_versions[@]}"; do live["$prefix"]=1; done
+
+        # `|| [[ -n "$line" ]]` so a file with no trailing newline still yields
+        # its last line -- `read` reports failure at EOF but has already set the
+        # variable, so a bare `read ... || pin=''` would silently drop the pin and
+        # prune the dir out from under it. pyenv allows several versions in this
+        # file, hence the loop and the rewrite preserving order.
+        if [[ -r "$pin_file" ]]; then
+            while read -r line || [[ -n "$line" ]]; do
+                [[ -n "$line" ]] && pins+=( "$line" )
+            done < "$pin_file"
+        fi
+
+        for pin in "${pins[@]}"; do
+            # leave alone unless it is a stale dir of ours
+            if [[ ${live["$pin"]+_} || ! -f "$pyenv_root/versions/$pin/$marker" ]]; then
+                new_pins+=( "$pin" )
+                continue
+            fi
+
+            # highest live patch in the pin's own series, compared numerically
+            # rather than taken as "last match" -- iteration order of
+            # live_versions is glob order, which is not version order.
+            series="${pin%.*}"
+            best=''
+            best_patch=-1
+            for v in "${live_versions[@]}"; do
+                [[ "$v" == "$series".* ]] || continue
+                patch="${v##*.}"
+                [[ "$patch" =~ ^[0-9]+$ ]] || continue
+                if (( patch > best_patch )); then
+                    best_patch=$patch
+                    best="$v"
+                fi
+            done
+
+            if [[ -n "$best" ]]; then
+                printf '%s: moving pin %s -> %s in %s\n' \
+                    'jwm_pyenv_link_homebrew_pythons' "$pin" "$best" "$pin_file" >&2
+                new_pins+=( "$best" )
+                pins_moved=1
+            else
+                # Nothing live in that series: brew dropped the formula, or the
+                # register pass failed for it. Repointing would be guessing at a
+                # version, so keep the pinned dir rather than strand the pin on
+                # something that is not installed.
+                printf '%s: keeping %s: pinned in %s, but no longer a Homebrew python and nothing live in %s.x\n' \
+                    'jwm_pyenv_link_homebrew_pythons' "$pin" "$pin_file" "$series" >&2
+                new_pins+=( "$pin" )
+                live["$pin"]=1
+            fi
+        done
+
+        # only touch the file if something actually moved
+        if (( pins_moved )); then
+            printf '%s\n' "${new_pins[@]}" > "$pin_file"
+        fi
+
+        for version_dir in "$pyenv_root"/versions/*; do
+            [[ -d "$version_dir" && -f "$version_dir/$marker" ]] || continue
+            version_name="${version_dir##*/}"
+            [[ ${live["$version_name"]+_} ]] && continue
+            rm -rf "$version_dir"
+        done
+    fi
+
     if (( ! nullglob_was_set )); then
         shopt -u nullglob
     fi
@@ -165,6 +284,35 @@ function asdf_shims() {
     asdf_shims="${ASDF_DATA_DIR:-$HOME/.asdf}/shims"
     if [[ -e "${asdf_shims}" ]]; then
         printf "%s\n" "$asdf_shims"
+        return
+    fi
+    printf '\n'
+}
+
+# add the pyenv shims dir, the way asdf_shims does for asdf.
+#
+# This replaces BOTH `eval "$(pyenv init -)"` and `eval "$(pyenv virtualenv-init
+# -)"`, which together cost ~0.14s on this mac and ~0.33s on the other. Putting
+# the shims on PATH is the only part of either that matters here: shim
+# resolution of `.python-version` works without them, verified against both
+# ~/code/tf-live-us (pins 3.8.20) and ~/jwm/proj/effective-pandas-book (3.12).
+#
+# Given up from `pyenv init -`: `pyenv shell`, pyenv's own tab-completion,
+# PYENV_SHELL, and the per-shell auto-rehash. Losing the rehash is a small win
+# beyond the 0.09s -- it silently rewrites all ~45 shims whenever PYENV_ROOT is
+# wrong, which is easy to do from a test harness.
+#
+# Given up from `pyenv virtualenv-init -`: the _pyenv_virtualenv_hook that
+# auto-activates a virtualenv on cd, PYENV_VIRTUALENV_INIT, and the
+# pyenv-virtualenv shims dir. Safe because `pyenv virtualenvs` is empty on both
+# macs -- if that changes, this is the line to restore.
+#
+# All of it is about driving pyenv interactively. Run `eval "$(pyenv init -
+# bash)"` by hand in a shell that needs it.
+function pyenv_shims() {
+    local pyenv_shims="${PYENV_ROOT:-$HOME/.pyenv}/shims"
+    if [[ -e "${pyenv_shims}" ]]; then
+        printf "%s\n" "$pyenv_shims"
         return
     fi
     printf '\n'
@@ -204,12 +352,11 @@ function jwm_set_path() {
     brew_cmd=$(jwm_brew_cmd 2>/dev/null)
     if [[ -n "$brew_cmd" ]]; then eval "$("$brew_cmd" shellenv)"; fi
 
-    # make Homebrew-managed Python versions visible to pyenv
-    jwm_pyenv_link_homebrew_pythons
-
-    # let pyenv do its thing
-    if command -v pyenv > /dev/null; then eval "$(pyenv init -)"; fi
-    if command -v pyenv-virtualenv-init > /dev/null; then eval "$(pyenv virtualenv-init -)"; fi
+    # pyenv gets its shims dir prepended below, via pyenv_shims. None of
+    # `pyenv init -`, `pyenv virtualenv-init -`, or
+    # jwm_pyenv_link_homebrew_pythons runs here any more -- together they were
+    # 0.86s of a 1.40s login shell on this mac, 1.07s of 1.22s on the other. See
+    # those functions for what moved where.
 
     # then prepend my preferred paths
     # first, remove any duplicate path elements
@@ -224,6 +371,7 @@ function jwm_set_path() {
         $(jwm_go_bin_paths) \
         $(jwm_gcloud_sdk_path) \
         $(jwm_cargo_path) \
+        $(pyenv_shims) \
         ; do
         if [[ ${dedup[$dir]+_} ]]; then
             continue

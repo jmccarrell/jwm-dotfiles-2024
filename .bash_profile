@@ -45,16 +45,15 @@ done;
 # path at source time.
 export BASH_COMPLETION_USER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion";
 
-brew_cmd=''
-if brew_cmd=$(jwm_brew_cmd 2>/dev/null); then
-    bp=''
-    bp=$("$brew_cmd" --prefix 2>/dev/null)
-    if [ -r "${bp}/etc/profile.d/bash_completion.sh" ]; then
-        export BASH_COMPLETION_COMPAT_DIR="${bp}/etc/bash_completion.d";
-        source "${bp}/etc/profile.d/bash_completion.sh";
-    elif [ -f /etc/bash_completion ]; then
-        source /etc/bash_completion;
-    fi;
+# HOMEBREW_PREFIX is already exported by the `brew shellenv` that jwm_set_path
+# ran above, and holds exactly what `brew --prefix` would print -- so reuse it
+# rather than forking brew a third time just to ask again (that fork was 0.04s).
+# Unset means no brew, in which case the /etc fallback is the right answer.
+if [ -r "${HOMEBREW_PREFIX:-}/etc/profile.d/bash_completion.sh" ]; then
+    export BASH_COMPLETION_COMPAT_DIR="${HOMEBREW_PREFIX}/etc/bash_completion.d";
+    source "${HOMEBREW_PREFIX}/etc/profile.d/bash_completion.sh";
+elif [ -f /etc/bash_completion ]; then
+    source /etc/bash_completion;
 fi;
 
 command -v asdf &> /dev/null && source <(asdf completion bash)
@@ -135,6 +134,14 @@ jwm_refresh_completions() {
     command -v just > /dev/null && just --completions bash              > "$d/just"
     command -v uv   > /dev/null && uv generate-shell-completion bash    > "$d/uv"
     command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
+
+    # Seam for tools that should not be named in a public repo: ~/.extra (which
+    # is untracked and machine-local) may define jwm_refresh_completions_extra
+    # to write its own files into $d. It is sourced near the top of this file,
+    # well before this function runs.
+    if declare -F jwm_refresh_completions_extra > /dev/null; then
+        jwm_refresh_completions_extra "$d"
+    fi
 
     printf 'bash completions refreshed in %s\n' "$d"
 }
