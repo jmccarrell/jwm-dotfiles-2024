@@ -609,6 +609,113 @@ gwt-rm() {
   git branch -D "$branch"
 }
 
+# ----------------------------------------------------- shell-init cache -----
+# Cache the output of `<tool> init bash`-style commands to a file and source
+# that, instead of forking the tool on every login shell.
+#
+# This is the pattern jwm_refresh_completions already uses, extended from
+# completions to shell init. bash-completion@2 gave completions a lazy loader
+# for free; shell init has no such mechanism, so the sourcing side lives here
+# too -- hence one table both halves read, rather than a list per half that can
+# drift.
+#
+# Measured on this mac (mean of 5, `just profile-shell-startup` for context):
+#   wt        21.8ms    starship  10.4ms    direnv  4.5ms    fzf     3.6ms
+#   asdf       3.6ms    zoxide     2.7ms
+# ~47ms of a ~191ms interactive login shell, paid per terminal tab.
+#
+# The tradeoff is staleness: a tool upgrade can change its init script while the
+# cached copy lingers. `jwm_refresh_shell_init` is wired into the `update` alias
+# for the same reason jwm_refresh_completions is -- `brew upgrade` is the only
+# place new versions arrive, and it runs immediately before.
+JWM_SHELL_INIT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bash-shell-init"
+
+# name -> the command whose stdout is the init script.
+#
+# starship is deliberately `--print-full-init` and not the documented
+# `starship init bash`: the latter emits a 67-byte stub whose whole body is
+# `eval -- "$(starship init bash --print-full-init)"`, so caching *it* would
+# still fork starship on every shell. Asking for the full init directly caches
+# the thing that actually matters. Cost of the pair was 6.0ms + 4.4ms.
+#
+# `command wt` is required, per the note in ~/.bash_profile: on a re-source the
+# wt function already exists, and a bare `wt` would recurse into it.
+#
+# brewenv is single-quoted so `$(jwm_brew_cmd)` is stored literally and resolved
+# when the script is generated -- jwm_brew_cmd stays the source of truth for
+# which brew, so the Workbrew prefix on the Mark43 mac and the Homebrew one
+# elsewhere each cache their own. Its output keeps the nested
+# `eval "$(path_helper -s)"`, which is what makes the cached copy still react to
+# the current PATH rather than freezing it.
+declare -A JWM_SHELL_INIT_CMDS=(
+    [starship]="starship init bash --print-full-init"
+    [zoxide]="zoxide init bash"
+    [direnv]="direnv hook bash"
+    [fzf]="fzf --bash"
+    [asdf]="asdf completion bash"
+    [wt]="command wt config shell init bash"
+    [brewenv]='"$(jwm_brew_cmd)" shellenv'
+)
+
+# How to tell whether a tool is present, for names where `command -v <name>` is
+# not the answer. brewenv is an artifact name rather than a command, and brew's
+# location is what jwm_brew_cmd exists to work out.
+declare -A JWM_SHELL_INIT_PROBE=(
+    [brewenv]="jwm_brew_cmd"
+)
+
+# Source the cached init for $1, generating it first if absent. Self-bootstraps,
+# so a fresh machine costs exactly what the un-cached version cost -- one fork --
+# and every later shell costs a source.
+#
+# Falls back to eval'ing the live command whenever the cache cannot be used, so
+# an unwritable dir or a tool that fails mid-upgrade degrades to today's
+# behaviour rather than to a broken shell. A short write is treated as failure
+# and discarded: `-s` catches the empty file a crashed tool leaves behind.
+jwm_shell_init() {
+    local name="$1"
+    local cmd="${JWM_SHELL_INIT_CMDS[$name]:-}"
+    local f="${JWM_SHELL_INIT_DIR}/${name}"
+
+    [[ -n "$cmd" ]] || return 0
+
+    if [[ ! -s "$f" ]]; then
+        if mkdir -p "${JWM_SHELL_INIT_DIR}" 2>/dev/null &&
+               eval "$cmd" > "$f" 2>/dev/null && [[ -s "$f" ]]; then
+            :
+        else
+            rm -f "$f" 2>/dev/null
+            eval "$(eval "$cmd" 2>/dev/null)"
+            return
+        fi
+    fi
+
+    source "$f"
+}
+
+# Regenerate every cached init script. Call after a toolchain upgrade; the
+# `update` alias does. Removing first means a tool that has since disappeared
+# stops being sourced, rather than lingering as a stale file forever.
+jwm_refresh_shell_init() {
+    local d="${JWM_SHELL_INIT_DIR}"
+    local name=''
+
+    mkdir -p "$d" || return 1
+
+    for name in "${!JWM_SHELL_INIT_CMDS[@]}"; do
+        rm -f "$d/$name"
+        eval "${JWM_SHELL_INIT_PROBE[$name]:-command -v $name}" > /dev/null 2>&1 || continue
+        if ! eval "${JWM_SHELL_INIT_CMDS[$name]}" > "$d/$name" 2>/dev/null ||
+               [[ ! -s "$d/$name" ]]; then
+            rm -f "$d/$name"
+            printf 'jwm_refresh_shell_init: %s produced nothing; will fork at startup\n' \
+                "$name" >&2
+        fi
+    done
+
+    printf 'bash shell-init cache refreshed in %s\n' "$d"
+}
+
 #
 # end jeffs functions
 #

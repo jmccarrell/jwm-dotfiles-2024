@@ -52,12 +52,16 @@ function jwm_go_bin_paths() {
 
 function jwm_standard_paths() {
     paths_fname=/etc/paths
+    local -a standard_paths=()
     if [[ -f ${paths_fname} && -r ${paths_fname} ]]; then
-        /bin/cat < $paths_fname
+        # mapfile rather than `/bin/cat < $paths_fname`: same output, one fewer
+        # fork per login shell. /etc/paths is six short lines; bash reads it
+        # directly without help.
+        mapfile -t standard_paths < "$paths_fname"
     else
         standard_paths=("/usr/local/bin" "/usr/bin" "/bin")
-        printf "%s\n" "${standard_paths[@]}"
     fi
+    (( ${#standard_paths[@]} )) && printf "%s\n" "${standard_paths[@]}"
 }
 
 function jwm_opt_homebrew_path() {
@@ -133,9 +137,19 @@ function jwm_set_path() {
     PATH=$(join_by : "${std_paths[@]}")
 
     # then let brew, etc. do their thing
+    #
+    # `brew shellenv` costs 17.0ms, of which only 2.3ms is the nested
+    # `path_helper -s` it eval's -- so caching its *script text* (which keeps
+    # that inner call, and therefore still reacts to the current PATH) saves the
+    # ~14.7ms brew itself takes. jwm_shell_init falls back to the live command,
+    # so a cold or unwritable cache behaves exactly as this line used to.
+    #
+    # jwm_brew_cmd stays the source of truth for *which* brew: the cached script
+    # is regenerated through it, and it is machine-local, so the Workbrew prefix
+    # on the Mark43 mac and the Homebrew one elsewhere never cross.
     local brew_cmd=''
     brew_cmd=$(jwm_brew_cmd 2>/dev/null)
-    if [[ -n "$brew_cmd" ]]; then eval "$("$brew_cmd" shellenv)"; fi
+    if [[ -n "$brew_cmd" ]]; then jwm_shell_init brewenv; fi
 
     # then prepend my preferred paths
     # first, remove any duplicate path elements
