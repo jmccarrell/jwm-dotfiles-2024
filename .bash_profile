@@ -58,27 +58,12 @@ fi;
 
 command -v asdf &> /dev/null && source <(asdf completion bash)
 
-# ensure kitty terminal is in my path on OS X
-if [ -e '/Applications/kitty.app/Contents/MacOS/kitty' ]; then
-    if [ ! -d ~/.local/bin ]; then
-        mkdir ~/.local/bin
-    fi
-    for f in kitty kitten; do
-        if [ ! -e ~/.local/bin/$f ]; then
-            ln -s /Applications/kitty.app/Contents/MacOS/$f ~/.local/bin
-        fi
-    done
-fi
-
 # Set up fzf key bindings and fuzzy completion
 command -v fzf &> /dev/null && eval "$(fzf --bash)"
 
 # set up direnv
 # cf: https://direnv.net/docs/hook.html
 command -v direnv &> /dev/null && eval "$(direnv hook bash)"
-
-test -e "${HOME}/.iterm2_shell_integration.bash" && \
-    ( source "${HOME}/.iterm2_shell_integration.bash" || true )
 
 # add rust/cargo to path
 [[ -e ${HOME}/.cargo/env ]] && source ${HOME}/.cargo/env
@@ -92,9 +77,11 @@ command -v packer &> /dev/null && complete -C packer packer
 # tofu autocomplete
 command -v tofu &> /dev/null && complete -C /opt/homebrew/bin/tofu tofu
 
+# Only the export: asdf_shims() in ~/.path already put the shims on PATH, reading
+# the same ${ASDF_DATA_DIR:-$HOME/.asdf} default, so prepending here just produced
+# a duplicate entry.
 if command -v asdf > /dev/null; then
     export ASDF_DATA_DIR=${HOME}/.asdf
-    export PATH="$ASDF_DATA_DIR/shims:$PATH"
 fi
 
 command -v starship &> /dev/null && eval "$(starship init bash)"
