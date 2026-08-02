@@ -38,12 +38,14 @@ done;
 # eagerly sourcing every script at startup the way v1 did.  It searches
 # $BASH_COMPLETION_USER_DIR/completions first, so tools that generate their own
 # completion script just drop one file named after the command there; see
-# jwm_refresh_completions below.  BASH_COMPLETION_COMPAT_DIR keeps any remaining
-# v1-style scripts under etc/bash_completion.d working.
+# jwm_refresh_completions in ~/.functions.  BASH_COMPLETION_COMPAT_DIR keeps any
+# remaining v1-style scripts under etc/bash_completion.d working.
 #
-# Must be exported before bash_completion.sh is sourced: v2 builds its lookup
-# path at source time.
-export BASH_COMPLETION_USER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion";
+# BASH_COMPLETION_USER_DIR is exported by ~/.functions, sourced at the top of
+# this file, because jwm_update_tools needs it and `daily` sources only
+# ~/.functions and ~/.path. v2 builds its lookup path at source time, so that
+# export has to happen before the bash_completion.sh below -- it does, but the
+# two are now in different files, so the invariant is spelled out at both ends.
 
 # HOMEBREW_PREFIX is already exported by the `brew shellenv` that jwm_set_path
 # ran above, and holds exactly what `brew --prefix` would print -- so reuse it
@@ -103,45 +105,16 @@ command -v zoxide &> /dev/null && jwm_shell_init zoxide
 # is cached rather than eval'd per tab.
 command -v wt &> /dev/null && jwm_shell_init wt
 
-# Generate bash completions for CLI tools that emit their own script.
-# bash-completion@2 lazily sources $BASH_COMPLETION_USER_DIR/completions/<cmd>
-# on the first TAB for <cmd>, so these only need writing once -- not on every
-# shell start.  They are generated artifacts and stay out of git; this function
-# is the tracked recipe.  Re-run it by hand after a toolchain or tool upgrade:
+# jwm_refresh_completions now lives in ~/.functions, next to the shell-init
+# cache it is a sibling of, so that jwm_update_tools can call it from `daily`.
 #
-#     jwm_refresh_completions
+# The bootstrap call stays here rather than moving with it. The function's
+# `command -v` probes run when it is called, not when it is defined, and this is
+# the first point in startup where ~/.cargo/env and the asdf/PATH setup above
+# have actually put rustup, ruff and friends on PATH.
 #
-# Deliberately placed after ~/.cargo/env and the asdf/PATH setup above, so the
-# `command -v` probes below can actually see rustup, ruff, and friends.
-jwm_refresh_completions() {
-    local d="${BASH_COMPLETION_USER_DIR}/completions"
-    mkdir -p "$d" || return 1
-
-    # `rustup completions bash cargo` emits a shim that sources
-    # "$(rustc --print sysroot)"/etc/bash_completion.d/cargo, resolving the
-    # sysroot at source time -- so it survives `rustup update` and toolchain
-    # switches, where a copied script would go stale.
-    if command -v rustup > /dev/null; then
-        rustup completions bash          > "$d/rustup"
-        rustup completions bash cargo    > "$d/cargo"
-    fi
-    command -v rg   > /dev/null && rg --generate=complete-bash          > "$d/rg"
-    command -v just > /dev/null && just --completions bash              > "$d/just"
-    command -v uv   > /dev/null && uv generate-shell-completion bash    > "$d/uv"
-    command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
-
-    # Seam for tools that should not be named in a public repo: ~/.extra (which
-    # is untracked and machine-local) may define jwm_refresh_completions_extra
-    # to write its own files into $d. It is sourced near the top of this file,
-    # well before this function runs.
-    if declare -F jwm_refresh_completions_extra > /dev/null; then
-        jwm_refresh_completions_extra "$d"
-    fi
-
-    printf 'bash completions refreshed in %s\n' "$d"
-}
-
-# Bootstrap once on a fresh machine; afterwards refresh explicitly.
+# Bootstrap once on a fresh machine; afterwards refresh explicitly, via
+# `update` (jwm-bin) or by calling jwm_refresh_completions by hand.
 [ -d "${BASH_COMPLETION_USER_DIR}/completions" ] || jwm_refresh_completions
 
 # Added by OrbStack: command-line tools and integration

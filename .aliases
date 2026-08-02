@@ -45,8 +45,6 @@ alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
-alias update='sudo softwareupdate -i -a; brew update; brew upgrade --no-ask; uv python upgrade; rustup update; jwm_refresh_completions; jwm_refresh_shell_init'
-
 # Canonical hex dump; some systems have this symlinked
 command -v hd > /dev/null || alias hd="hexdump -C"
 

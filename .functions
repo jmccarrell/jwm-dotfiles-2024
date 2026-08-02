@@ -843,6 +843,113 @@ jwm_refresh_shell_init() {
     printf 'bash shell-init cache refreshed in %s\n' "$d"
 }
 
+# ---------------------------------------------------- completions cache -----
+# bash-completion@2 lazily sources $BASH_COMPLETION_USER_DIR/completions/<cmd> on
+# the first TAB for <cmd>, so these only need writing once -- not on every shell
+# start. They are generated artifacts and stay out of git; this function is the
+# tracked recipe.
+#
+# This lives here rather than in ~/.bash_profile, where it used to, because
+# jwm_update_tools below calls it and `daily` sources only ~/.functions and
+# ~/.path. Same reason jwm_cargo_path is in ~/.path and the uv system-certs
+# setting is in ~/.config/uv/uv.toml: ~/.bash_profile is invisible to the
+# launchd job.
+#
+# ORDERING INVARIANT: bash-completion v2 builds its lookup path at source time,
+# so BASH_COMPLETION_USER_DIR must be exported before ~/.bash_profile sources
+# bash_completion.sh. That holds because ~/.bash_profile sources ~/.functions in
+# its first few lines, well above the completion block -- if that ever inverts,
+# TAB stops finding these files.
+export BASH_COMPLETION_USER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion";
+
+jwm_refresh_completions() {
+    local d="${BASH_COMPLETION_USER_DIR}/completions"
+    mkdir -p "$d" || return 1
+
+    # `rustup completions bash cargo` emits a shim that sources
+    # "$(rustc --print sysroot)"/etc/bash_completion.d/cargo, resolving the
+    # sysroot at source time -- so it survives `rustup update` and toolchain
+    # switches, where a copied script would go stale.
+    if command -v rustup > /dev/null; then
+        rustup completions bash          > "$d/rustup"
+        rustup completions bash cargo    > "$d/cargo"
+    fi
+    command -v rg   > /dev/null && rg --generate=complete-bash          > "$d/rg"
+    command -v just > /dev/null && just --completions bash              > "$d/just"
+    command -v uv   > /dev/null && uv generate-shell-completion bash    > "$d/uv"
+    command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
+
+    # Seam for tools that should not be named in a public repo: ~/.extra (which
+    # is untracked and machine-local) may define jwm_refresh_completions_extra
+    # to write its own files into $d.
+    #
+    # The seam is resolved when this function runs, not when it is defined, so
+    # it does not matter that ~/.bash_profile sources ~/.extra after
+    # ~/.functions. What does matter: `daily` never sources ~/.extra, so an
+    # unattended refresh writes the tracked completions only and leaves the
+    # machine-local ones as they were. bin/update sources ~/.extra precisely so
+    # the interactive path keeps doing the whole job.
+    if declare -F jwm_refresh_completions_extra > /dev/null; then
+        jwm_refresh_completions_extra "$d"
+    fi
+
+    printf 'bash completions refreshed in %s\n' "$d"
+}
+
+# --------------------------------------------------------- update the tools -----
+# The chore list shared by `daily` (unattended, under launchd) and `bin/update`
+# (interactive) -- both in jwm-bin. It exists because those two had drifted:
+# `daily` ran brew upgrade every morning and refreshed neither cache, so the
+# shell-init and completion caches sat pointing at the previous versions' output
+# until someone typed `update` by hand. #32 traded a fork-per-shell for a
+# staleness window; this closes it.
+#
+# Everything here is safe unattended: no sudo, no prompt, no terminal needed.
+# The steps that do need a terminal -- softwareupdate on jeffs mac, the
+# quarantine strip on the Mark43 one -- live in bin/update instead. That split
+# is the gate: it is why `daily` cannot walk into a sudo password prompt launchd
+# has no way to answer, without needing a flag to say so.
+#
+# The order is a dependency chain, not taste:
+#   brew update/upgrade   first -- everything below except rustup is a formula
+#   uv python upgrade     uv is a brew formula, so it must follow brew upgrade
+#   rustup update         before the refreshes, which shell out to rustup
+#   refresh completions   invokes rustup, rg, just, uv, ruff
+#   refresh shell-init    invokes starship, zoxide, direnv, fzf, asdf, wt, brew
+#
+# Failure labels go onto UPDATE_FAILURES, which the caller resets and reads --
+# the same contract gs_* has with GS_FAILURES, so there is one pattern here
+# rather than two. Returns 1 if anything failed, for callers that only want a
+# yes/no.
+jwm_update_tools() {
+    local status=0
+
+    brew update || { UPDATE_FAILURES+=(brew-update); status=1; }
+
+    # The branch is about which brew, not whose machine, so it is if/else rather
+    # than the two independent `if`s daily used to carry: a host that is neither
+    # still gets a sane upgrade instead of silently getting none.
+    if mark43_host_p; then
+        # Workbrew machine: casks are disallowed by the workspace policy
+        # (/opt/workbrew/var/workbrew.env.json), and a cask upgrade is also the
+        # case most likely to want a prompt -- which launchd cannot answer. So
+        # formulae only. NO_AUTO_UPDATE stops upgrade re-running the update we
+        # just did.
+        HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade --formula \
+            || { UPDATE_FAILURES+=(brew-upgrade); status=1; }
+    else
+        brew upgrade --no-ask || { UPDATE_FAILURES+=(brew-upgrade); status=1; }
+    fi
+
+    uv python upgrade || { UPDATE_FAILURES+=(uv-python); status=1; }
+    rustup update     || { UPDATE_FAILURES+=(rustup);    status=1; }
+
+    jwm_refresh_completions || { UPDATE_FAILURES+=(completions); status=1; }
+    jwm_refresh_shell_init  || { UPDATE_FAILURES+=(shell-init);  status=1; }
+
+    return "$status"
+}
+
 #
 # end jeffs functions
 #
