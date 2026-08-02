@@ -43,33 +43,40 @@
 # on both macs.
 disable_tools = ["python"]
 
-# mise walks up from cwd looking for <dir>/.config/mise/config.toml, not just the
-# global path -- so this very file is ALSO found as a project config whenever cwd
-# is inside the dotfiles checkout, and an untrusted project config is a hard error,
-# not a warning:
+# TRUST: nothing to configure, but the reason is worth writing down, because two
+# rounds of review chased it before landing here.
 #
-#   mise ERROR Config files in …/.config/mise/config.toml are not trusted.
+# mise walks up from cwd looking for <dir>/.config/mise/config.toml, not only the
+# global path -- so this file is also found as a *project* config in every checkout
+# of this repo, and an untrusted project config is a hard ERROR.
 #
-# Trust is per-directory, and this repo's whole workflow is worktree-per-feature,
-# so `mise trust` by hand would mean trusting every new `wt switch --create`
-# checkout forever. Naming the repo and its worktrees container fixes it once.
+# It is trusted anyway, for free. The global config is trusted implicitly, and mise
+# shares that trust with the equivalent path inside linked git worktrees (see
+# `mise trust --help`). `just install` stows from the main checkout, so
+# ~/.config/mise/config.toml resolves there, and every worktree inherits it --
+# including worktrees that do not exist yet.
 #
-# Deliberately NOT the whole of ~/jwm/proj: that would also auto-trust
-# emacs-config/reference-emacs-configs, which holds third-party clones -- including
-# one whose .tool-versions pins 14 tools. Trusting a cloned repo's mise config is
-# not something to do as a side effect of a dotfiles change.
+# Isolated to be sure, same worktree, only the symlink source differing:
 #
-# This self-bootstraps despite the apparent circularity: the global read (the
-# canonical path is trusted implicitly, symlink or not) establishes trust before
-# the project-scanned copy is evaluated. Verified through a stow-shaped symlink.
+#   global <- main checkout      -> resolves, no warning        (the real topology)
+#   global <- unrelated path     -> hard ERROR, not trusted
 #
-# Note the asymmetry with ignored_config_paths, which is env-var-only and silently
-# no-ops from a config file. trusted_config_paths does take effect here. Both
-# confirmed on the same mise build.
-trusted_config_paths = [
-    "~/jwm/proj/jwm-dotfiles-2024",
-    "~/jwm/proj/jwm-dotfiles-2024.worktrees",
-]
+# So: no trusted_config_paths here, no MISE_TRUSTED_CONFIG_PATHS anywhere, and no
+# worktrunk hook to run `mise trust` per worktree. Every earlier reproduction of a
+# trust failure had the global config symlinked from somewhere other than the main
+# checkout, which is not how stow installs it.
+#
+# Two ways to break it, both worth recognising rather than rediscovering:
+#   - stow from a worktree instead of the main checkout. Trust would then flow from
+#     that worktree, and the main checkout plus every other worktree would error.
+#   - mise's paranoid mode, which disables worktree trust sharing outright on the
+#     grounds that worktrees can hold different config contents.
+#
+# disable_tools stays in this file rather than becoming MISE_DISABLE_TOOLS. Measured
+# against a .tool-versions pinning python: from here it applies unconditionally, 0
+# entries; as an env var mise reclaims python in any context lacking the var, 1
+# entry. That setting is what keeps uv sole owner of python, so it has to hold
+# everywhere, not only in shells that sourced some file.
 
 [tools]
 # `lts` rather than a pinned patch, matching the `nodejs lts` this replaces and
