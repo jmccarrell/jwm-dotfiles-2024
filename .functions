@@ -891,9 +891,9 @@ jwm_refresh_completions() {
     # sat. `asdf completion bash` was a completion parked in the shell-init table
     # because asdf had no init to cache; mise has both, so they separate cleanly.
     #
-    # The emitted script starts `if ! type -p usage`, so it degrades to nothing
-    # useful without the `usage` CLI. Install it with `mise use -g usage` if TAB
-    # on mise subcommands ever matters.
+    # The emitted script opens `if ! type -p usage`, mise's own graceful
+    # degradation for machines without the `usage` CLI. Both macs have it from brew
+    # (4.1.0), so completions work immediately and that branch never fires here.
     command -v mise > /dev/null && mise completion bash                 > "$d/mise"
 
     # Seam for tools that should not be named in a public repo: ~/.extra (which
