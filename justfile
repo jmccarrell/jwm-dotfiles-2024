@@ -6,7 +6,14 @@ test_dir := home_dir / "tmp/test-dotfiles"
 #                  whole dir into one symlink (keeps app runtime junk out of the repo)
 #   NOTE: --adopt is deliberately NOT used. Adoption is a one-off import tool; in a
 #   routine install it silently pulls target files into the repo and diverges machines.
-stow_flags := "--verbose --no-folding"
+#
+# --verbose is deliberately NOT shared any more. `install` now runs unattended from
+# bin/daily (jwm-bin) every morning, and under -R stow narrates all ~21 links on
+# every run whether or not anything changed: a healthy no-op is 36 lines. Quiet
+# here means silence when there is nothing to say, and a conflict report when there
+# is. `check` and `test` opt back in explicitly, because for them the narration IS
+# the output.
+stow_flags := "--no-folding"
 
 # the '.' package installs the whole repo tree ($HOME + .config/*), minus repo meta,
 # the repo-local .claude/ (settings for THIS repo), and the claude/ package (which the
@@ -16,18 +23,39 @@ root_ignores := "--ignore=justfile --ignore=README.md --ignore=LICENSE --ignore=
 @_:
     just --list
 
-# stow one package tree onto a target, creating the target if needed
+# stow one package tree onto a target, creating the target if needed.
+#
+# -R (restow = unstow, then stow) rather than -S (stow). -S is add-only: it links
+# whatever is new and never looks at what left, so a file deleted from the repo
+# keeps its now-dangling symlink in $HOME forever. Retiring kitty needed manual
+# cleanup for exactly this reason, and `just status` would not have caught it --
+# it iterates `git ls-files`, so it only ever validates files that ARE in the repo,
+# never orphans from files that are not.
+#
+# -R costs the same (23ms vs 24ms on this tree) and is no less safe: stow 2.4
+# resolves the whole plan and reports conflicts BEFORE touching the filesystem, so
+# a conflict aborts with everything still in place, exit 1, under either flag.
+# What it does cost is churn -- every run unlinks and relinks all ~21 links, which
+# leaves a ~24ms window per run where the symlinks are absent.
 [private]
 stow-pkg target pkg *flags:
     mkdir -p {{target}}
-    stow {{stow_flags}} {{flags}} -t {{target}} -S {{pkg}}
+    stow {{stow_flags}} {{flags}} -t {{target}} -R {{pkg}}
 
 # Install all dotfiles
 install: (stow-pkg home_dir "." root_ignores) (stow-pkg (home_dir / ".claude") "claude")
 
+# Deliberately -S where `install` is -R, and verbose where `install` is quiet.
+# This is a preview, so what matters is telling "nothing to do" from "something to
+# do" at a glance: -S --no is 1 line on a healthy tree and grows only for a new
+# link or a conflict, where -R --no is 37 lines either way.
+#
+# The cost of that choice: this will not show a pending deletion cleanup, since
+# only -R performs one. `just install` is what reconciles them.
+
 # Preview the root package without writing anything
 check:
-    stow {{stow_flags}} --no {{root_ignores}} -t {{home_dir}} -S .
+    stow {{stow_flags}} --verbose --no {{root_ignores}} -t {{home_dir}} -S .
 
 # This exists because the answer rots silently. On macOS every terminal tab is a
 # login shell, so anything ~/.bash_profile does is billed per tab -- and by Aug
@@ -110,8 +138,11 @@ status:
     done < <(git ls-files .config)
     exit $fail
 
+# Verbose on purpose: seeing what got linked is the entire point of a test
+# install, and unlike `install` nothing here runs unattended.
+
 # Test install into a temp directory
-test: (stow-pkg test_dir "." root_ignores) (stow-pkg (test_dir / ".claude") "claude")
+test: (stow-pkg test_dir "." root_ignores "--verbose") (stow-pkg (test_dir / ".claude") "claude" "--verbose")
 
 # Clean test directory
 clean:
