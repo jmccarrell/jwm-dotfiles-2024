@@ -726,7 +726,9 @@ gwt-rm() {
   git branch -D "$branch"
 }
 
-# ----------------------------------------------------- shell-init cache -----
+#
+# shell-init cache
+#
 # Cache the output of `<tool> init bash`-style commands to a file and source
 # that, instead of forking the tool on every login shell.
 #
@@ -853,7 +855,9 @@ jwm_refresh_shell_init() {
     printf 'bash shell-init cache refreshed in %s\n' "$d"
 }
 
-# ---------------------------------------------------- completions cache -----
+#
+# completions cache
+#
 # bash-completion@2 lazily sources $BASH_COMPLETION_USER_DIR/completions/<cmd> on
 # the first TAB for <cmd>, so these only need writing once -- not on every shell
 # start. They are generated artifacts and stay out of git; this function is the
@@ -894,7 +898,6 @@ jwm_refresh_completions() {
     printf 'bash completions refreshed in %s\n' "$d"
 }
 
-# --------------------------------------------------------- update the tools -----
 # The chore list shared by `daily` (unattended, under launchd) and `bin/update`
 # (interactive) -- both in jwm-bin.
 jwm_update_tools() {
