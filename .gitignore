@@ -1,2 +1,8 @@
+# The machine-local default identity: this file's whole job is to differ per mac,
+# so it cannot be tracked. Create it by hand on a new machine (see README).
+#
+# Its sibling .gitconfig.personal is deliberately NOT here. That address is the
+# same on both macs, and .gitconfig pulls it in via includeIf gitdir:~/jwm/ --
+# where git treats a missing file as a silent no-op, so an untracked one means a
+# fresh clone commits to personal repos under the machine default instead.
 .gitconfig.machine
-.gitconfig.personal
