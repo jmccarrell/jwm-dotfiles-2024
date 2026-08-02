@@ -862,12 +862,17 @@ jwm_refresh_shell_init() {
     # which is a fault, not an instruction. The pyenv prune reasoned the same way
     # about an empty live set, for the same reason.
     #
-    # Deliberately NOT extended to the completions dir. jwm_refresh_completions has
-    # a machine-local seam -- ~/.extra may define jwm_refresh_completions_extra to
-    # write files this repo cannot know the names of -- and `daily` never sources
-    # ~/.extra. A prune there would delete those every morning and regenerate them
-    # only when `update` ran interactively. The shell-init table has no such seam,
-    # which is what makes pruning safe here and unsafe there.
+    # Deliberately NOT extended to the completions dir, and no longer for the reason
+    # #37 gave. That reason was jwm_refresh_completions' machine-local seam, which is
+    # gone -- wiggum was the only tool using it and its line is tracked now.
+    #
+    # The reason that outlives the seam is whose directory each one is.
+    # bash-shell-init is an invention of this repo: nothing else knows the name, so
+    # a file there that the table does not name can only be our own leftover.
+    # $BASH_COMPLETION_USER_DIR/completions is bash-completion@2's documented user
+    # location, which any installer may legitimately write into. Pruning it would
+    # mean deleting other software's files nightly on the assumption that this
+    # function is the only writer, and that assumption is not ours to make.
     if (( ${#JWM_SHELL_INIT_CMDS[@]} > 0 )); then
         for f in "$d"/*; do
             [[ -f "$f" ]] || continue
@@ -919,19 +924,12 @@ jwm_refresh_completions() {
     command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
     command -v mise > /dev/null && mise completion bash                 > "$d/mise"
 
-    # Seam for tools that should not be named in a public repo: ~/.extra (which
-    # is untracked and machine-local) may define jwm_refresh_completions_extra
-    # to write its own files into $d.
-    #
-    # The seam is resolved when this function runs, not when it is defined, so
-    # it does not matter that ~/.bash_profile sources ~/.extra after
-    # ~/.functions. What does matter: `daily` never sources ~/.extra, so an
-    # unattended refresh writes the tracked completions only and leaves the
-    # machine-local ones as they were. bin/update sources ~/.extra precisely so
-    # the interactive path keeps doing the whole job.
-    if declare -F jwm_refresh_completions_extra > /dev/null; then
-        jwm_refresh_completions_extra "$d"
-    fi
+    # `wiggum completion` is a 46-byte stub whose whole body is
+    # `eval "$(_WIGGUM_COMPLETE=bash_source wiggum)"`, so caching *it* would still
+    # fork wiggum at every completion. Asking for bash_source directly caches the
+    # 671-byte function that actually matters -- the same distinction starship's
+    # --print-full-init makes in JWM_SHELL_INIT_CMDS.
+    command -v wiggum > /dev/null && _WIGGUM_COMPLETE=bash_source wiggum > "$d/wiggum"
 
     printf 'bash completions refreshed in %s\n' "$d"
 }
