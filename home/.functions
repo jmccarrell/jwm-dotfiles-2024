@@ -1016,8 +1016,9 @@ jwm_update_tools() {
 
     jwm_brew_bundle || { UPDATE_FAILURES+=(brew-bundle); status=1; }
 
-    uv python upgrade || { UPDATE_FAILURES+=(uv-python); status=1; }
-    rustup update     || { UPDATE_FAILURES+=(rustup);    status=1; }
+    uv python upgrade     || { UPDATE_FAILURES+=(uv-python); status=1; }
+    uv tool upgrade --all || { UPDATE_FAILURES+=(uv-tools);  status=1; }
+    rustup update         || { UPDATE_FAILURES+=(rustup);    status=1; }
 
     jwm_refresh_completions || { UPDATE_FAILURES+=(completions); status=1; }
     jwm_refresh_shell_init  || { UPDATE_FAILURES+=(shell-init);  status=1; }
