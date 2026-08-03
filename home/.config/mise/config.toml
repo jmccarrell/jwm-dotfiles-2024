@@ -1,88 +1,56 @@
 # mise global configuration — https://mise.jdx.dev/configuration.html
 #
-# Shared by both macs. Machine-specific tool versions do NOT belong here: mise
-# also reads ~/.config/mise/conf.d/*.toml and merges it per-key, so a tool only
-# one mac wants goes in an untracked file there. That seam exists because the two
-# macs genuinely differ -- this one runs terraform, the other has never had it and
-# uses brew opentofu instead. It also depends on ~/.config/mise being a real
-# directory rather than a folded symlink, which `just status` now checks.
+# Shared by both macs. Machine-specific tool versions do NOT belong here: mise also
+# reads ~/.config/mise/conf.d/*.toml and merges it per-key, so a tool only one mac
+# wants goes in an untracked file there. This mac runs terraform; the other uses brew
+# opentofu and has never had it. That seam needs ~/.config/mise to be a real
+# directory rather than a folded symlink, which `just status` checks.
 #
-# PRECEDENCE, measured on both macs rather than assumed: this file WINS over
-# ~/.tool-versions. A *project* .tool-versions still wins over this, which is what
-# you want -- ~/code/tf-live-us resolves terraform from its own file.
+# This file WINS over ~/.tool-versions. A *project* .tool-versions still wins over
+# this, which is what you want. Move ~/.tool-versions aside anyway when migrating off
+# asdf: it is dead weight that silently becomes authoritative the moment a tool is
+# dropped from [tools] below.
 #
-# Move ~/.tool-versions aside anyway when migrating off asdf. Not because it
-# overrides this -- it does not -- but because left in place it is dead weight that
-# silently becomes authoritative the moment a tool is dropped from [tools] below.
+# `mise use -g` and `mise settings set` write to this path, which is a stow symlink,
+# so they edit the repo working tree in place. Also true of starship.toml, but mise
+# is the one with a first-class CLI for mutating its own config.
 #
-# (`mise use -g` does print "…which overrides the global config". That warning
-# reflects a global config reached via MISE_CONFIG_DIR, where ~/.tool-versions
-# genuinely does win. At the canonical ~/.config/mise/config.toml it does not, and
-# stderr is empty. An earlier version of this comment had it backwards.)
+# TRUST: nothing to configure, and nothing to be careful about. mise walks up from
+# cwd looking for <dir>/.config/mise/config.toml. Under home/ no checkout of this
+# repo has that path, so this file is only ever reached as the global config, which
+# is trusted implicitly -- `just install` is safe from the main checkout or any
+# worktree.
 #
-# One property worth knowing: `mise use -g` and `mise settings set` write to this
-# path, which is a stow symlink -- so they edit the repo working tree in place.
-# True of starship.toml too, but mise is the first of these with a first-class CLI
-# for mutating its own config, so it is far likelier to happen by accident.
+# That was not free before the home/ move. The file sat at the checkout root, so
+# every worktree carried one and mise found it as a *project* config, where being
+# untrusted is a hard error. Trust sharing runs main checkout -> linked worktrees and
+# not the reverse (`mise trust --help`), so a global symlinked out of a worktree left
+# the main checkout and every other worktree erroring. Same matrix, only the symlink
+# source differing:
+#
+#   old layout, global <- main       all OK      new layout, global <- main      all OK
+#   old layout, global <- worktree   main and    new layout, global <- worktree  all OK
+#                                    peers fail
 
 [settings]
 # uv owns python, as of #35. Without this, mise would claim the python entries in
-# .tool-versions files across ~/code -- 6 of them, pinning four different versions
-# -- and reintroduce a second interpreter manager days after we removed the first.
+# .tool-versions files across ~/code -- 6 of them, pinning four different versions --
+# and reintroduce a second interpreter manager days after we removed the first. Those
+# pins have always been inert, because asdf never had a python plugin; mise ships it
+# as a core tool and would honour them immediately.
 #
-# Those pins have always been inert: asdf never had a python plugin, so nothing
-# has read them in years. mise ships it as a core tool and would honour them
-# immediately, which is the whole reason this line is here rather than absent.
+# The .python-version files are unaffected either way: idiomatic version files are
+# opt-in and off (idiomatic_version_file_enable_tools = []).
 #
-# Verified on the other mac against a reference config pinning 14 tools including
-# 3.12.7: `mise ls --current` drops from 14 entries to 13, and the one that
-# disappears is the interpreter. Everything else still resolves.
-#
-# The 12 .python-version files are NOT affected either way -- idiomatic version
-# files are opt-in and off (idiomatic_version_file_enable_tools = []), confirmed
-# on both macs.
+# This stays here rather than becoming MISE_DISABLE_TOOLS, which mise would ignore in
+# any context lacking the var. Sole ownership of python has to hold everywhere, not
+# only in shells that sourced something.
 disable_tools = ["python"]
 
-# TRUST: nothing to configure, but the reason is worth writing down, because two
-# rounds of review chased it before landing here.
-#
-# mise walks up from cwd looking for <dir>/.config/mise/config.toml, not only the
-# global path -- so this file is also found as a *project* config in every checkout
-# of this repo, and an untrusted project config is a hard ERROR.
-#
-# It is trusted anyway, for free. The global config is trusted implicitly, and mise
-# shares that trust with the equivalent path inside linked git worktrees (see
-# `mise trust --help`). `just install` stows from the main checkout, so
-# ~/.config/mise/config.toml resolves there, and every worktree inherits it --
-# including worktrees that do not exist yet.
-#
-# Isolated to be sure, same worktree, only the symlink source differing:
-#
-#   global <- main checkout      -> resolves, no warning        (the real topology)
-#   global <- unrelated path     -> hard ERROR, not trusted
-#
-# So: no trusted_config_paths here, no MISE_TRUSTED_CONFIG_PATHS anywhere, and no
-# worktrunk hook to run `mise trust` per worktree. Every earlier reproduction of a
-# trust failure had the global config symlinked from somewhere other than the main
-# checkout, which is not how stow installs it.
-#
-# Two ways to break it, both worth recognising rather than rediscovering:
-#   - stow from a worktree instead of the main checkout. Trust would then flow from
-#     that worktree, and the main checkout plus every other worktree would error.
-#   - mise's paranoid mode, which disables worktree trust sharing outright on the
-#     grounds that worktrees can hold different config contents.
-#
-# disable_tools stays in this file rather than becoming MISE_DISABLE_TOOLS. Measured
-# against a .tool-versions pinning python: from here it applies unconditionally, 0
-# entries; as an env var mise reclaims python in any context lacking the var, 1
-# entry. That setting is what keeps uv sole owner of python, so it has to hold
-# everywhere, not only in shells that sourced some file.
-
 [tools]
-# `lts` rather than a pinned patch, matching the `nodejs lts` this replaces and
-# what mise's own asdf-migration script produces. mise resolves the alias at
-# install time and records the alias, not the resolution -- `mise use -g --pin`
-# is the flag if a frozen version is ever wanted instead.
+# `lts` rather than a pinned patch, matching the `nodejs lts` this replaces. mise
+# records the alias, not the resolution -- `mise use -g --pin` freezes a version if
+# that is ever wanted.
 #
 # Shared deliberately: both macs want one node policy. terraform is the tool that
 # differs, and it lives in conf.d.
