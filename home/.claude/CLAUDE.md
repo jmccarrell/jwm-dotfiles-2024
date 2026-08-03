@@ -138,7 +138,9 @@ See `emacs-config/CLAUDE.md` for full workspace layout.
 See `emacs-config/literate-emacs.d/CLAUDE.md` for project conventions.
 
 ### /Users/jeff/jwm/proj/jwm-dotfiles-2024
-Dotfiles repo — a plain git repo (files at the repo root; this file is `claude/CLAUDE.md`).
+Dotfiles repo — a plain git repo. Everything it installs lives under `home/`, which
+mirrors `$HOME`; this file is `home/.claude/CLAUDE.md`. The repo root holds only
+tooling, so a file added there is never seeded into `$HOME`.
 See `jwm-dotfiles-2024/README.md` for layout.
 
 ### /Users/jeff/pdata/jeff-ci

@@ -72,9 +72,10 @@
 
 [core]
 
-	# Use custom `.gitignore` and `.gitattributes`
-	excludesfile = ~/.gitignore
-	attributesfile = ~/.gitattributes
+	# No excludesfile / attributesfile here on purpose. Unset, git reads
+	# ~/.config/git/{ignore,attributes}, which is where this repo seeds them --
+	# and a file basenamed .gitignore is in stow's built-in ignore list, so the
+	# old ~/.gitignore could never have been a symlink at all.
 
 	# Treat spaces before tabs and all kinds of trailing whitespace as an error
 	# [default] trailing-space: looks for spaces at the end of a line

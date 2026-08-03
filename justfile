@@ -1,79 +1,67 @@
 home_dir := env("HOME")
 test_dir := home_dir / "tmp/test-dotfiles"
 
-# flags shared by every stow call:
-#   --no-folding : make target dirs real dirs with per-file symlinks, never fold a
-#                  whole dir into one symlink (keeps app runtime junk out of the repo)
-#   NOTE: --adopt is deliberately NOT used. Adoption is a one-off import tool; in a
-#   routine install it silently pulls target files into the repo and diverges machines.
+# --no-folding keeps every target dir a real dir with per-file symlinks. Folded to
+# a directory symlink, everything the owning app writes there later -- caches,
+# session state, downloaded packages -- lands in this repo instead of $HOME.
 #
-# --verbose is deliberately NOT shared any more. `install` now runs unattended from
-# bin/daily (jwm-bin) every morning, and under -R stow narrates all ~21 links on
-# every run whether or not anything changed: a healthy no-op is 36 lines. Quiet
-# here means silence when there is nothing to say, and a conflict report when there
-# is. `check` and `test` opt back in explicitly, because for them the narration IS
-# the output.
+# --adopt is never used. It pulls existing target files into the repo, which
+# diverges the two macs silently; run it by hand if an import is ever wanted.
+#
+# --verbose is not shared. `install` runs unattended from bin/daily (jwm-bin), so it
+# stays silent unless there is a conflict to report. `check` and `test` opt back in,
+# because for them the narration is the output.
 stow_flags := "--no-folding"
-
-# the '.' package installs the whole repo tree ($HOME + .config/*), minus repo meta,
-# the repo-local .claude/ (settings for THIS repo), and the claude/ package (which the
-# install recipe stows into ~/.claude separately, NOT ~/claude).
-root_ignores := "--ignore=justfile --ignore=README.md --ignore=LICENSE --ignore=claude"
 
 @_:
     just --list
 
 # stow one package tree onto a target, creating the target if needed.
 #
-# -R (restow = unstow, then stow) rather than -S (stow). -S is add-only: it links
-# whatever is new and never looks at what left, so a file deleted from the repo
-# keeps its now-dangling symlink in $HOME forever. Retiring kitty needed manual
-# cleanup for exactly this reason, and `just status` would not have caught it --
-# it iterates `git ls-files`, so it only ever validates files that ARE in the repo,
-# never orphans from files that are not.
+# -R (restow), never -S. -S only adds, so a file dropped from the repo keeps its
+# dangling symlink in $HOME forever. -R's unstow pass reaps any link that resolves
+# into this repo and whose source is gone -- which is also what migrates a file from
+# one path in the repo to another.
 #
-# -R costs the same (23ms vs 24ms on this tree) and is no less safe: stow 2.4
-# resolves the whole plan and reports conflicts BEFORE touching the filesystem, so
-# a conflict aborts with everything still in place, exit 1, under either flag.
-# What it does cost is churn -- every run unlinks and relinks all ~21 links, which
-# leaves a ~24ms window per run where the symlinks are absent.
+# A conflict aborts the whole plan before anything is written, so a failed run leaves
+# $HOME exactly as it was. What -R costs is churn: every run relinks the whole seed,
+# so the symlinks are briefly absent.
 [private]
 stow-pkg target pkg *flags:
     mkdir -p {{target}}
     stow {{stow_flags}} {{flags}} -t {{target}} -R {{pkg}}
 
+# There are no --ignore flags, and that is the point. `home/` holds exactly the seed
+# set, so anything else in this repo -- justfile, README, LICENSE, the repo-local
+# .claude/, an untracked TASK.md -- is outside the package and cannot reach $HOME.
+# The old '.' package needed a hand-maintained ignore list, and any file added at the
+# repo root was seeded into $HOME until someone remembered to extend it.
+
 # Install all dotfiles
-install: (stow-pkg home_dir "." root_ignores) (stow-pkg (home_dir / ".claude") "claude")
+install: (stow-pkg home_dir "home")
 
-# Deliberately -S where `install` is -R, and verbose where `install` is quiet.
-# This is a preview, so what matters is telling "nothing to do" from "something to
-# do" at a glance: -S --no is 1 line on a healthy tree and grows only for a new
-# link or a conflict, where -R --no is 37 lines either way.
-#
-# The cost of that choice: this will not show a pending deletion cleanup, since
-# only -R performs one. `just install` is what reconciles them.
+# -S and verbose where `install` is -R and quiet: a preview only has to read as
+# "nothing to do" or "something to do" at a glance. The cost is that it cannot show a
+# pending deletion cleanup, because only -R performs one.
 
-# Preview the root package without writing anything
+# Preview the install without writing anything
 check:
-    stow {{stow_flags}} --verbose --no {{root_ignores}} -t {{home_dir}} -S .
+    stow {{stow_flags}} --verbose --no -t {{home_dir}} -S home
 
 # This exists because the answer rots silently. On macOS every terminal tab is a
-# login shell, so anything ~/.bash_profile does is billed per tab -- and by Aug
-# 2026 a `pyenv init -` plus a homebrew-python symlink pass had grown to 0.86s of
-# a 1.40s startup with nothing to surface it.
+# login shell, so anything ~/.bash_profile does is billed per tab.
 #
-# Prints the end-to-end cost first, then a per-line breakdown from an xtrace with
-# $EPOCHREALTIME timestamps in PS4. The "site" column is file:line, so a
-# regression points straight at the offending line.
-#
+# Prints the end-to-end cost, then a per-line breakdown from an xtrace carrying
+# $EPOCHREALTIME in PS4. The "site" column is file:line, so a regression points
+# straight at the offending line.
+
 # Time a login shell, and show where the time goes
 profile-shell-startup runs="7":
     #!/usr/bin/env bash
     set -uo pipefail
     [ -n "${EPOCHREALTIME:-}" ] || { echo "needs bash 5+ (got ${BASH_VERSION})" >&2; exit 1; }
 
-    # warm the page cache first -- a cold first run reads ~2x slower and would
-    # dominate a small sample
+    # warm the page cache first; a cold first run would dominate a small sample
     "$BASH" --login -c exit > /dev/null 2>&1
     t0=$EPOCHREALTIME
     for (( i = 0; i < {{runs}}; i++ )); do "$BASH" --login -c exit > /dev/null 2>&1; done
@@ -81,10 +69,10 @@ profile-shell-startup runs="7":
     printf '\n  %.1f ms per login shell (mean of {{runs}})\n\n' \
         "$(echo "($t1 - $t0) * 1000 / {{runs}}" | bc -l)"
 
-    # Trace a plain `source ~/.bash_profile` rather than a real login shell: the
-    # tracer needs PS4 set before the first traced command, which a login shell
-    # gives no hook for. /etc/profile is skipped, hence the small shortfall
-    # against the figure above.
+    # Trace `source ~/.bash_profile` rather than a real login shell: the tracer needs
+    # PS4 set before the first traced command, and a login shell gives no hook for
+    # that. /etc/profile is skipped, hence the small shortfall against the figure
+    # above.
     prof=$(mktemp -t shell-startup-prof) || exit 1
     trace=$(mktemp -t shell-startup-trace) || exit 1
     trap 'rm -f "$prof" "$trace"' EXIT
@@ -97,9 +85,9 @@ profile-shell-startup runs="7":
     "$BASH" --noprofile --norc "$prof" > /dev/null 2>&1
 
     printf '  %8s  %5s  %s\n' seconds calls site
-    # Cost of a traced line = the gap until the next timestamp. Lines with no
-    # leading timestamp are a traced command's own stderr; skipping them keeps
-    # their elapsed time attributed to the command that emitted them.
+    # A traced line costs the gap until the next timestamp. Lines with no leading
+    # timestamp are a traced command's own stderr; skipping them keeps that time
+    # attributed to the command that emitted it.
     awk '
       $2 ~ /^[0-9]+\.[0-9]+$/ {
         ts = $2 + 0
@@ -113,44 +101,41 @@ profile-shell-startup runs="7":
     ' "$trace" | sort -rn | head -n 20
 
 # Verify the seed is healthy: every seeded file is a symlink into this repo, and every
-# shared parent dir under ~/.config is a REAL dir (never folded into a symlink). Exit
-# non-zero on any failure. Seed list is derived from git, so it never drifts.
+# managed parent dir is a REAL dir, never folded into a symlink. Exit non-zero on any
+# failure. The seed list comes from git, so it never drifts.
 status:
     #!/usr/bin/env bash
     set -uo pipefail
     repo="$(pwd)"
     fail=0
-    # ~/.config and the managed subdirs must stay real dirs (the folding tripwire).
-    #
-    # .config/mise matters more than the others: mise reads conf.d/*.toml out of it
-    # and that is the seam carrying machine-local tool versions -- terraform on the
-    # Mark43 mac, nothing on the other. Folded to a symlink, conf.d would have to
-    # live in the repo, which defeats the point of it being machine-local.
-    #
-    # .config/yazi likewise: `ya pkg add` downloads plugin and flavor source trees
-    # into it, so folded, every package yazi installs lands in this repo.
-    for d in .config .config/ghostty .config/direnv .config/worktrunk .config/mise .config/yazi; do
+    # The folding tripwire. Three of these hold state that must never reach the repo:
+    # .claude every Claude session, project and plugin; .config/mise the conf.d/*.toml
+    # carrying machine-local tool versions, which is the whole point of it being
+    # machine-local; .config/yazi whatever `ya pkg add` downloads.
+    for d in .claude .config .config/direnv .config/ghostty .config/git \
+             .config/mise .config/worktrunk .config/yazi; do
       t="{{home_dir}}/$d"
       if [ -L "$t" ]; then echo "✗ $d is a SYMLINK (folded!) — must be a real dir"; fail=1
       elif [ -d "$t" ]; then echo "✓ $d is a real dir"
       else echo "✗ $d missing"; fail=1; fi
     done
-    # every tracked .config file must be a symlink resolving into this repo
+    # Every tracked file under home/ must be a symlink resolving back to it. A file's
+    # path below home/ is where its symlink lands, hence the ${f#home/} strip.
     while IFS= read -r f; do
-      t="{{home_dir}}/$f"
-      if [ ! -L "$t" ]; then echo "✗ $f not a symlink"; fail=1
+      t="{{home_dir}}/${f#home/}"
+      if [ ! -L "$t" ]; then echo "✗ ${f#home/} not a symlink"; fail=1
       elif [ "$(cd "$(dirname "$t")" && realpath "$(readlink "$t")")" != "$repo/$f" ]; then
-        echo "✗ $f -> $(readlink "$t") (not this repo)"; fail=1
-      elif [ ! -e "$t" ]; then echo "✗ $f dangling"; fail=1
-      else echo "✓ $f -> repo"; fi
-    done < <(git ls-files .config)
+        echo "✗ ${f#home/} -> $(readlink "$t") (not this repo)"; fail=1
+      elif [ ! -e "$t" ]; then echo "✗ ${f#home/} dangling"; fail=1
+      else echo "✓ ${f#home/} -> repo"; fi
+    done < <(git ls-files home)
     exit $fail
 
-# Verbose on purpose: seeing what got linked is the entire point of a test
-# install, and unlike `install` nothing here runs unattended.
+# Verbose on purpose: seeing what got linked is the entire point of a test install,
+# and unlike `install` nothing here runs unattended.
 
 # Test install into a temp directory
-test: (stow-pkg test_dir "." root_ignores "--verbose") (stow-pkg (test_dir / ".claude") "claude" "--verbose")
+test: (stow-pkg test_dir "home" "--verbose")
 
 # Clean test directory
 clean:
