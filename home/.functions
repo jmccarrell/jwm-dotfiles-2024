@@ -913,6 +913,50 @@ jwm_refresh_completions() {
     printf 'bash completions refreshed in %s\n' "$d"
 }
 
+# Install what the Brewfiles in jwm-bin name: the shared one, plus this host's.
+# Runs after `brew upgrade`, so --no-upgrade -- this only adds what is missing.
+#
+# `install`, not `check`. check exits non-zero on OUTDATED as well as missing,
+# which is what its own --no-upgrade flag turns off; left on, the nightly run
+# goes red the day any entry drifts a version on a machine where nothing is
+# absent.
+#
+# Only `tap` and `brew` lines are fed to it. install accepts no --no-cask or
+# --no-npm (they are dump-only flags), so the filter is the mechanism rather than
+# a preference: a cask install prompts and launchd cannot answer, and brew reads
+# npm globals from whichever node is active, which mise moves. The host files
+# still record both so they can provision a replacement mac; the nightly job just
+# does not act on them.
+#
+# Never `brew bundle cleanup` -- it uninstalls everything absent from the file.
+jwm_brew_bundle() {
+    local repo="$(jwm_dir)/proj/jwm-bin"
+    local status=0
+    local f='' tmp=''
+    local -a files=( "${repo}/Brewfile" )
+
+    # Gated before the file is ever read: neither mac may evaluate the other's,
+    # or the nightly run fails on packages it was never meant to have.
+    if mark43_host_p; then
+        files+=( "${repo}/Brewfile.mark43" )
+    elif jwm_host_p; then
+        files+=( "${repo}/Brewfile.jwm" )
+    fi
+
+    for f in "${files[@]}"; do
+        [ -r "$f" ] || {
+            printf 'jwm_brew_bundle: %s unreadable\n' "$f" >&2
+            status=1; continue
+        }
+        tmp="$(mktemp -t brewfile)" || { status=1; continue; }
+        awk '/^(tap|brew) /' "$f" > "$tmp"
+        HOMEBREW_NO_AUTO_UPDATE=1 brew bundle install --file="$tmp" --no-upgrade || status=1
+        rm -f "$tmp"
+    done
+
+    return "$status"
+}
+
 # The chore list shared by `daily` (unattended, under launchd) and `bin/update`
 # (interactive) -- both in jwm-bin.
 jwm_update_tools() {
@@ -931,6 +975,8 @@ jwm_update_tools() {
     else
         brew upgrade --no-ask || { UPDATE_FAILURES+=(brew-upgrade); status=1; }
     fi
+
+    jwm_brew_bundle || { UPDATE_FAILURES+=(brew-bundle); status=1; }
 
     uv python upgrade || { UPDATE_FAILURES+=(uv-python); status=1; }
     rustup update     || { UPDATE_FAILURES+=(rustup);    status=1; }
