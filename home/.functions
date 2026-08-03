@@ -951,6 +951,22 @@ jwm_refresh_completions() {
     printf 'bash completions refreshed in %s\n' "$d"
 }
 
+# The Brewfiles that apply to this mac: the shared one, plus this host's.
+#
+# Gated before any file is read, so neither mac evaluates the other's -- that
+# would fail the nightly run on packages it was never meant to have. Both
+# jwm_brew_bundle and jwm_uv_tools read this, so the gate exists in one place.
+jwm_brewfiles() {
+    local repo="$(jwm_dir)/proj/jwm-bin"
+
+    printf '%s\n' "${repo}/Brewfile"
+    if mark43_host_p; then
+        printf '%s\n' "${repo}/Brewfile.mark43"
+    elif jwm_host_p; then
+        printf '%s\n' "${repo}/Brewfile.jwm"
+    fi
+}
+
 # Install what the Brewfiles in jwm-bin name: the shared one, plus this host's.
 # Runs after `brew upgrade`, so --no-upgrade -- this only adds what is missing.
 #
@@ -959,27 +975,24 @@ jwm_refresh_completions() {
 # goes red the day any entry drifts a version on a machine where nothing is
 # absent.
 #
-# Only `tap` and `brew` lines are fed to it. install accepts no --no-cask or
-# --no-npm (they are dump-only flags), so the filter is the mechanism rather than
-# a preference: a cask install prompts and launchd cannot answer, and brew reads
-# npm globals from whichever node is active, which mise moves. The host files
-# still record both so they can provision a replacement mac; the nightly job just
-# does not act on them.
+# Only `tap`, `brew` and `uv` lines are fed to it. install accepts no --no-cask
+# or --no-npm (they are dump-only flags), so the filter is the mechanism rather
+# than a preference: a cask install prompts and launchd cannot answer, and brew
+# reads npm globals from whichever node is active, which mise moves. The host
+# files still record both so they can provision a replacement mac; the nightly
+# job just does not act on them.
+#
+# uv is in that list because brew bundle installs a missing uv tool correctly and
+# idempotently, the `with:` extras form included -- a second run reports Using.
+# It will not UPGRADE one; that is what jwm_uv_tools exists for.
 #
 # Never `brew bundle cleanup` -- it uninstalls everything absent from the file.
 jwm_brew_bundle() {
-    local repo="$(jwm_dir)/proj/jwm-bin"
     local status=0
     local f='' tmp=''
-    local -a files=( "${repo}/Brewfile" )
+    local -a files=()
 
-    # Gated before the file is ever read: neither mac may evaluate the other's,
-    # or the nightly run fails on packages it was never meant to have.
-    if mark43_host_p; then
-        files+=( "${repo}/Brewfile.mark43" )
-    elif jwm_host_p; then
-        files+=( "${repo}/Brewfile.jwm" )
-    fi
+    while IFS= read -r f; do files+=( "$f" ); done < <(jwm_brewfiles)
 
     for f in "${files[@]}"; do
         [ -r "$f" ] || {
@@ -987,10 +1000,58 @@ jwm_brew_bundle() {
             status=1; continue
         }
         tmp="$(mktemp -t brewfile)" || { status=1; continue; }
-        awk '/^(tap|brew) /' "$f" > "$tmp"
+        awk '/^(tap|brew|uv) /' "$f" > "$tmp"
         HOMEBREW_NO_AUTO_UPDATE=1 brew bundle install --file="$tmp" --no-upgrade || status=1
         rm -f "$tmp"
     done
+
+    return "$status"
+}
+
+# Upgrade the uv tools the Brewfiles declare, and report any that are installed
+# without being declared.
+#
+# By name rather than `uv tool upgrade --all`: --all maintains whatever happens
+# to be installed, so a tool tried once years ago stays current forever and never
+# surfaces. Naming them keeps the declared set the only managed set.
+#
+# This is a separate step because brew bundle installs a uv tool but never
+# upgrades one -- measured, not assumed: a cowsay pinned to 5.0 reported "Using"
+# and stayed 5.0 under `brew bundle install`, with and without --no-upgrade.
+#
+# An undeclared tool is reported and left alone, not failed on. It is a fact
+# about the machine worth seeing, not a fault, and `daily` going red would make
+# it Jeff's to clear before anything else could be noticed.
+#
+# `uv tool upgrade` refuses a tool installed with an exact version pin, telling
+# you to reinstall with @latest. Nothing here pins, and brew bundle installs
+# unpinned, so that only bites a tool pinned by hand.
+jwm_uv_tools() {
+    local status=0
+    local t='' declared='' extra=''
+
+    command -v uv > /dev/null || return 0
+
+    declared=$(jwm_brewfiles | while IFS= read -r f; do
+        [ -r "$f" ] && awk -F'"' '/^uv "/ { print $2 }' "$f"
+    done | sort -u)
+
+    if [ -z "$declared" ]; then
+        printf 'jwm_uv_tools: no uv tools declared\n'
+        return 0
+    fi
+
+    while IFS= read -r t; do
+        [ -n "$t" ] || continue
+        uv tool upgrade "$t" || status=1
+    done <<< "$declared"
+
+    # `uv tool list` indents each tool's executables under its name; the tool
+    # names are the unindented lines, first field.
+    extra=$(uv tool list 2>/dev/null | awk '/^[^ -]/ { print $1 }' | sort -u \
+                | comm -23 - <(printf '%s\n' "$declared"))
+    [ -n "$extra" ] && printf 'jwm_uv_tools: installed but not declared: %s\n' \
+                              "$(printf '%s' "$extra" | tr '\n' ' ')"
 
     return "$status"
 }
@@ -1016,9 +1077,9 @@ jwm_update_tools() {
 
     jwm_brew_bundle || { UPDATE_FAILURES+=(brew-bundle); status=1; }
 
-    uv python upgrade     || { UPDATE_FAILURES+=(uv-python); status=1; }
-    uv tool upgrade --all || { UPDATE_FAILURES+=(uv-tools);  status=1; }
-    rustup update         || { UPDATE_FAILURES+=(rustup);    status=1; }
+    uv python upgrade || { UPDATE_FAILURES+=(uv-python); status=1; }
+    jwm_uv_tools      || { UPDATE_FAILURES+=(uv-tools);  status=1; }
+    rustup update     || { UPDATE_FAILURES+=(rustup);    status=1; }
 
     jwm_refresh_completions || { UPDATE_FAILURES+=(completions); status=1; }
     jwm_refresh_shell_init  || { UPDATE_FAILURES+=(shell-init);  status=1; }
