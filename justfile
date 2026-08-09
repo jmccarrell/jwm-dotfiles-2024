@@ -104,7 +104,7 @@ update-claude-plugins:
 backup-claude-skills:
     #!/usr/bin/env bash
     set -euo pipefail
-    out="{{home_dir}}/claude-skills-backup-$(date +%F-%H%M%S).tgz"
+    out="{{home_dir}}/tmp/claude-skills-backup-$(date +%F-%H%M%S).tgz"
     tar czf "$out" -C "{{home_dir}}/.claude" skills
     echo "wrote $out"
 
