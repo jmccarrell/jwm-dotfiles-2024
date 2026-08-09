@@ -13,6 +13,11 @@ test_dir := home_dir / "tmp/test-dotfiles"
 # because for them the narration is the output.
 stow_flags := "--no-folding"
 
+# The Claude Code plugins wanted on every machine. Both claude-plugins recipes read
+# this one list, so it cannot drift between them. Space-separated, expanded into a
+# real bash array by each recipe.
+claude_plugins := "mattpocock-skills"
+
 @_:
     just --list
 
@@ -47,6 +52,47 @@ install: (stow-pkg home_dir "home")
 # Preview the install without writing anything
 check:
     stow {{stow_flags}} --verbose --no -t {{home_dir}} -S home
+
+# Deliberately not a dependency of `install`. This repo seeds files; it does not
+# install software, and `install` runs unattended from bin/daily (jwm-bin), where a
+# GitHub round-trip is a new way for the daily chore to hang or fail.
+#
+# Additive, never reconciling: a recipe that uninstalled anything absent from
+# claude_plugins would delete a plugin the moment it was being trialled on one mac,
+# and `just` recipes get re-run casually. Removing a plugin stays a hand operation.
+#
+# `marketplace update` is not optional. A machine's cached marketplace can predate the
+# entry being installed -- both macs' caches did -- and the install then fails to
+# resolve a plugin that exists upstream.
+
+# Install the wanted Claude Code plugins
+install-claude-plugins:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    plugins=({{claude_plugins}})
+    claude plugins marketplace update
+    installed="$(claude plugins list --json)"
+    for p in "${plugins[@]}"; do
+        if jq -e --arg p "$p" 'any(.[]; .name == $p)' <<< "$installed" > /dev/null; then
+            echo "already installed: $p"
+        else
+            claude plugins install "$p" --scope user
+        fi
+    done
+
+# Separate from install because a version bump changes how the skills behave, mid
+# project. That is a deliberate act, not a side effect of a recipe run for some other
+# reason. Claude Code needs a restart before an updated plugin takes effect.
+
+# Update the wanted Claude Code plugins to their latest marketplace version
+update-claude-plugins:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    plugins=({{claude_plugins}})
+    claude plugins marketplace update
+    for p in "${plugins[@]}"; do
+        claude plugins update "$p" --scope user
+    done
 
 # This exists because the answer rots silently. On macOS every terminal tab is a
 # login shell, so anything ~/.bash_profile does is billed per tab.

@@ -57,6 +57,22 @@ Guarantees, and the flags that provide them (see `justfile`):
 - **conflicts error out** → a real file owned by another tool is never clobbered; stow
   stops and reports instead, leaving `$HOME` untouched.
 
+## Claude Code plugins
+
+`just install` seeds *files*; it does not install *software*. Claude Code plugins are
+therefore a separate, explicit step on a new machine:
+
+```sh
+just install-claude-plugins   # install the wanted plugins (idempotent)
+just update-claude-plugins    # bump them to their latest marketplace version
+```
+
+The wanted set is the `claude_plugins` variable at the top of the `justfile` — that
+list is the declaration; the recipes only ever add. Nothing here uninstalls, so a
+plugin dropped from the list stays on the machines until removed by hand with
+`claude plugins uninstall`. An updated plugin takes effect on the next Claude Code
+restart.
+
 ## Git identity
 
 Shared Git config uses three layers:
