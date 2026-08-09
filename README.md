@@ -57,6 +57,39 @@ Guarantees, and the flags that provide them (see `justfile`):
 - **conflicts error out** → a real file owned by another tool is never clobbered; stow
   stops and reports instead, leaving `$HOME` untouched.
 
+## Claude Code plugins
+
+`just install` seeds *files*; it does not install *software*. Claude Code plugins are
+therefore a separate, explicit step on a new machine:
+
+```sh
+just install-claude-plugins   # install the wanted plugins (idempotent)
+just update-claude-plugins    # bump them to their latest marketplace version
+```
+
+The wanted set is the `claude_plugins` variable at the top of the `justfile` — that
+list is the declaration; the recipes only ever add. Nothing here uninstalls, so a
+plugin dropped from the list stays on the machines until removed by hand with
+`claude plugins uninstall`. An updated plugin takes effect on the next Claude Code
+restart.
+
+### Hand-written skills
+
+`home/.claude/skills/` seeds hand-written skills, so they survive a machine rebuild —
+and survive tooling that treats `~/.claude/skills` as its own to clear out.
+
+**This repo is public**, so the bar for adding one is not "I wrote it" but *"it is
+safe to publish and I want it on both machines."* A skill naming internal services,
+tools or workflows belongs somewhere private; it does not go here.
+
+```sh
+just backup-claude-skills   # tarball ~/.claude/skills before any bulk operation on it
+```
+
+Take that snapshot before anything that deletes in `~/.claude/skills`. Installers
+there are not always surgical: `npx skills remove --all` clears the whole directory
+rather than only the skills its own lockfile claims.
+
 ## Git identity
 
 Shared Git config uses three layers:
