@@ -73,7 +73,8 @@ install-claude-plugins:
     claude plugins marketplace update
     installed="$(claude plugins list --json)"
     for p in "${plugins[@]}"; do
-        if jq -e --arg p "$p" 'any(.[]; .name == $p)' <<< "$installed" > /dev/null; then
+        # entries are identified by a plugin@marketplace id, with no bare name field
+        if jq -e --arg p "$p" 'any(.[]; (.id | split("@")[0]) == $p)' <<< "$installed" > /dev/null; then
             echo "already installed: $p"
         else
             claude plugins install "$p" --scope user
