@@ -100,10 +100,11 @@ update-claude-plugins:
 # only what its lockfile claims -- it took python-via-uv on lyra, which survived only
 # because Time Machine was running. Take the tarball before any bulk operation there.
 
-# Snapshot ~/.claude/skills to a dated tarball in $HOME
+# Snapshot ~/.claude/skills to a dated tarball in ~/tmp
 backup-claude-skills:
     #!/usr/bin/env bash
     set -euo pipefail
+    mkdir -p "{{home_dir}}/tmp"
     out="{{home_dir}}/tmp/claude-skills-backup-$(date +%F-%H%M%S).tgz"
     tar czf "$out" -C "{{home_dir}}/.claude" skills
     echo "wrote $out"
