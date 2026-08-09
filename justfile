@@ -95,6 +95,19 @@ update-claude-plugins:
         claude plugins update "$p" --scope user
     done
 
+# Anything hand-written under ~/.claude/skills that this repo does not seed exists in
+# exactly one place. `npx skills remove --all` deletes the whole directory rather than
+# only what its lockfile claims -- it took python-via-uv on lyra, which survived only
+# because Time Machine was running. Take the tarball before any bulk operation there.
+
+# Snapshot ~/.claude/skills to a dated tarball in $HOME
+backup-claude-skills:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    out="{{home_dir}}/claude-skills-backup-$(date +%F-%H%M%S).tgz"
+    tar czf "$out" -C "{{home_dir}}/.claude" skills
+    echo "wrote $out"
+
 # This exists because the answer rots silently. On macOS every terminal tab is a
 # login shell, so anything ~/.bash_profile does is billed per tab.
 #
@@ -155,11 +168,13 @@ status:
     set -uo pipefail
     repo="$(pwd)"
     fail=0
-    # The folding tripwire. Three of these hold state that must never reach the repo:
-    # .claude every Claude session, project and plugin; .config/mise the conf.d/*.toml
-    # carrying machine-local tool versions, which is the whole point of it being
-    # machine-local; .config/yazi whatever `ya pkg add` downloads.
-    for d in .claude .config .config/direnv .config/ghostty .config/git \
+    # The folding tripwire. Four of these hold state that must never reach the repo:
+    # .claude every Claude session, project and plugin; .claude/skills whatever
+    # `claude plugin init` scaffolds there; .config/mise the conf.d/*.toml carrying
+    # machine-local tool versions, which is the whole point of it being machine-local;
+    # .config/yazi whatever `ya pkg add` downloads.
+    for d in .claude .claude/hooks .claude/skills .claude/skills/python-via-uv \
+             .config .config/direnv .config/ghostty .config/git \
              .config/mise .config/worktrunk .config/yazi; do
       t="{{home_dir}}/$d"
       if [ -L "$t" ]; then echo "✗ $d is a SYMLINK (folded!) — must be a real dir"; fail=1
