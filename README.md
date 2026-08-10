@@ -90,6 +90,12 @@ Take that snapshot before anything that deletes in `~/.claude/skills`. Installer
 there are not always surgical: `npx skills remove --all` clears the whole directory
 rather than only the skills its own lockfile claims.
 
+Removing by explicit name is the safe form, but the name list has to come from a
+filter on the lockfile's `source`, not from the whole lockfile — one lockfile can
+carry skills from several upstreams, and only some of them are the ones being
+retired. On the work mac its 28 entries spanned three upstreams, 5 of which were
+work skills nothing else provided.
+
 ## Git identity
 
 Shared Git config uses three layers:

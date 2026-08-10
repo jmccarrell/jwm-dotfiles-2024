@@ -99,6 +99,10 @@ update-claude-plugins:
 # exactly one place. `npx skills remove --all` deletes the whole directory rather than
 # only what its lockfile claims -- it took python-via-uv on lyra, which survived only
 # because Time Machine was running. Take the tarball before any bulk operation there.
+#
+# -h, because the tree mixes real dirs with symlinks pointing outside it. Without it tar
+# archives such a skill as the link, so the snapshot holds nothing of what it points at
+# -- empty for precisely the skills whose only copy is on the far side of the link.
 
 # Snapshot ~/.claude/skills to a dated tarball in ~/tmp
 backup-claude-skills:
@@ -106,7 +110,7 @@ backup-claude-skills:
     set -euo pipefail
     mkdir -p "{{home_dir}}/tmp"
     out="{{home_dir}}/tmp/claude-skills-backup-$(date +%F-%H%M%S).tgz"
-    tar czf "$out" -C "{{home_dir}}/.claude" skills
+    tar czhf "$out" -C "{{home_dir}}/.claude" skills
     echo "wrote $out"
 
 # This exists because the answer rots silently. On macOS every terminal tab is a
