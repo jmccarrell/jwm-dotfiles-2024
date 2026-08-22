@@ -106,6 +106,16 @@ function mise_shims() {
     printf '\n'
 }
 
+function mcc_lab_paths() {
+    mcc_lab_bin="${HOME}/mcc-lab-bin"
+    if [[ -e "${mcc_lab_bin}" ]]; then
+        printf "%s\n" "$mcc_lab_bin"
+        return
+    fi
+    printf '\n'
+}
+
+
 function mark43_paths() {
     declare -a mark43_paths=( "$HOME/mark43/bin"
                               "$HOME/code/mark43/dev-tools/vault" )
@@ -159,6 +169,7 @@ function jwm_set_path() {
         $(mise_shims) \
         $(jwm_home_paths) \
         $(mark43_paths) \
+        $(mcc_lab_paths) \
         $(jwm_go_bin_paths) \
         $(jwm_gcloud_sdk_path) \
         $(jwm_cargo_path) \
