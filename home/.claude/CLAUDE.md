@@ -10,9 +10,9 @@
 
 Primary: Python, Emacs Lisp, Shell/Bash
 
-- Python: prefer standard library where sufficient; use virtual environments for projects with dependencies
+- Python: prefer standard library where sufficient; use uv for projects with dependencies
 - Emacs Lisp: functions and variables use the `jwm/` prefix; package management via `use-package`
-- Shell: prefer bash; POSIX-compatible where portability matters
+- Shell: prefer bash version 5; POSIX-compatible where portability matters
 
 ## Comments
 
@@ -161,10 +161,6 @@ Dotfiles repo — a plain git repo. Everything it installs lives under `home/`, 
 mirrors `$HOME`; this file is `home/.claude/CLAUDE.md`. The repo root holds only
 tooling, so a file added there is never seeded into `$HOME`.
 See `jwm-dotfiles-2024/README.md` for layout.
-
-### /Users/jeff/pdata/jeff-ci
-Personal quantitative finance / CI project. Standard git repo (not worktree-enabled).
-See `jeff-ci/CLAUDE.md` for project conventions and architecture.
 
 ## TASK.md convention
 
