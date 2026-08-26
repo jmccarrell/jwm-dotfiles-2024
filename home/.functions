@@ -608,6 +608,7 @@ gs_mark43_repos() {
 
 gs_lab() {
     local status=0
+    git_sync "$(jwm_dir)/proj/lab" origin || status=1
     git_sync "$(jwm_dir)/proj/lab/lab-infra" origin || status=1
     git_sync "$(jwm_dir)/proj/lab/lab-gitops" origin || status=1
     git_sync "$(jwm_dir)/proj/lab/mcc-lab-bin" origin || status=1
