@@ -784,22 +784,15 @@ JWM_SHELL_INIT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bash-shell-init"
 # `eval "$(path_helper -s)"`, which is what makes the cached copy still react to
 # the current PATH rather than freezing it.
 #
-# mise needs `env -u __MISE_DIFF` for that same reason, but it cannot be arranged
-# by choosing a gentler subcommand: `mise activate bash` emits a leading
-# `export PATH='<literal>'` whenever __MISE_DIFF is already set, which is mise
-# restoring the asking shell's pre-mise PATH -- a runtime act, not init. There is
-# no clean shell to generate from, because __MISE_DIFF is exported and
-# ~/.bash_profile activates mise before anything else runs, so a nested login
-# shell and `jwm_refresh_shell_init` both inherit it. Unsetting the whole
-# __MISE_* family instead would take __MISE_EXE with it, which the `mise`
-# function dereferences to find the binary; generation then yields nothing and
-# the empty-file fallback forks mise on every shell forever.
+# mise is deliberately absent. Its init is no longer a function of the tool: as of
+# 2026.9.1 `mise activate bash` bakes a literal `export PATH=` and a frozen
+# __MISE_ORIG_PATH into every generated script, from any environment. ~/.bash_profile
+# eval's it live instead, at 22ms per shell.
 declare -A JWM_SHELL_INIT_CMDS=(
     [starship]="starship init bash --print-full-init"
     [zoxide]="zoxide init bash"
     [direnv]="direnv hook bash"
     [fzf]="fzf --bash"
-    [mise]="env -u __MISE_DIFF mise activate bash"
     [wt]="command wt config shell init bash"
     [brewenv]='"$(jwm_brew_cmd)" shellenv'
 )
@@ -811,24 +804,6 @@ declare -A JWM_SHELL_INIT_PROBE=(
     [brewenv]="jwm_brew_cmd"
 )
 
-# True when the script $2, generated for tool $1, froze a PATH into itself; says
-# so on stderr, since the caller's only recourse is to throw it away.
-#
-# A cached init has to be a function of the tool, not of the shell that generated
-# it. A literal `export PATH=` is a runtime act that got captured as init: the
-# copy replays one shell's PATH into every later shell, overwriting what
-# jwm_set_path just built, and the guards in ~/.path cannot see it coming because
-# ~/.bash_profile sources ~/.path first and this second.
-#
-# Rejecting only stops the persisting. The caller still falls back to the live
-# command, so this shell gets whatever the tool says -- the same as it got before
-# any of this was cached. What the guard buys is that the next shell asks again.
-jwm_shell_init_froze_path() {
-    grep -q '^export PATH=' "$2" 2>/dev/null || return 1
-    printf 'shell-init cache: %s froze PATH into its init script; not caching it\n' \
-        "$1" >&2
-}
-
 # Source the cached init for $1, generating it first if absent. Self-bootstraps,
 # so a fresh machine costs exactly what the un-cached version cost -- one fork --
 # and every later shell costs a source.
@@ -836,8 +811,7 @@ jwm_shell_init_froze_path() {
 # Falls back to eval'ing the live command whenever the cache cannot be used, so
 # an unwritable dir or a tool that fails mid-upgrade degrades to today's
 # behaviour rather than to a broken shell. A short write is treated as failure
-# and discarded: `-s` catches the empty file a crashed tool leaves behind, and
-# jwm_shell_init_froze_path the one that captured a PATH.
+# and discarded: `-s` catches the empty file a crashed tool leaves behind.
 jwm_shell_init() {
     local name="$1"
     local cmd="${JWM_SHELL_INIT_CMDS[$name]:-}"
@@ -846,11 +820,8 @@ jwm_shell_init() {
     [[ -n "$cmd" ]] || return 0
 
     if [[ ! -s "$f" ]]; then
-        if mkdir -p "${JWM_SHELL_INIT_DIR}" 2>/dev/null &&
-               eval "$cmd" > "$f" 2>/dev/null && [[ -s "$f" ]] &&
-               ! jwm_shell_init_froze_path "$name" "$f"; then
-            :
-        else
+        if ! { mkdir -p "${JWM_SHELL_INIT_DIR}" 2>/dev/null &&
+                   eval "$cmd" > "$f" 2>/dev/null && [[ -s "$f" ]]; }; then
             rm -f "$f" 2>/dev/null
             eval "$(eval "$cmd" 2>/dev/null)"
             return
@@ -863,15 +834,14 @@ jwm_shell_init() {
 # Regenerate every cached init script. Call after a toolchain upgrade; `update`
 # (jwm-bin) does, via jwm_update_tools.
 #
-# Three kinds of staleness, and the loop below only ever handled the first:
+# Two kinds of staleness:
 #
 #   tool still in the table, binary gone   -> the rm -f before the probe covers it
-#   tool removed from the table entirely   -> nothing referenced its file again
-#   tool captured this shell's state       -> jwm_shell_init_froze_path rejects it
+#   tool removed from the table entirely   -> the prune at the end covers it
 #
-# The third is one this function creates rather than cures: it runs from an
-# interactive shell, so every tool it asks is answering a shell that is already
-# initialised. See the mise note on JWM_SHELL_INIT_CMDS.
+# A third kind -- a tool whose init captures the generating shell's state -- has no
+# cure here, because this runs from an interactive shell and every tool it asks is
+# answering an already-initialised one. That is why mise is not in the table.
 #
 jwm_refresh_shell_init() {
     local d="${JWM_SHELL_INIT_DIR}"
@@ -888,8 +858,6 @@ jwm_refresh_shell_init() {
             rm -f "$d/$name"
             printf 'jwm_refresh_shell_init: %s produced nothing; will fork at startup\n' \
                 "$name" >&2
-        elif jwm_shell_init_froze_path "$name" "$d/$name"; then
-            rm -f "$d/$name"
         fi
     done
 

@@ -63,7 +63,10 @@ fi;
 # runs and what it costs. Falls back to the live command if the cache is
 # unusable, so behaviour is unchanged either way.
 
-command -v mise &> /dev/null && jwm_shell_init mise
+# mise is eval'd live rather than cached: as of 2026.9.1 its init script bakes in a
+# literal `export PATH=`, which a cached copy would replay into every later shell,
+# clobbering the PATH jwm_set_path built above.
+command -v mise &> /dev/null && eval "$(mise activate bash)"
 
 # Set up fzf key bindings and fuzzy completion
 command -v fzf &> /dev/null && jwm_shell_init fzf
