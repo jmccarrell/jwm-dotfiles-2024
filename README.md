@@ -15,6 +15,7 @@ home/.config/direnv/direnvrc     -> ~/.config/direnv/direnvrc
 home/.config/ghostty/config.ghostty
 home/.config/git/ignore          -> ~/.config/git/ignore
 home/.config/git/attributes      -> ~/.config/git/attributes
+home/.config/mcc-lab/openbao-ca.pem  -> ~/.config/mcc-lab/openbao-ca.pem
 home/.config/mise/config.toml    home/.config/uv/uv.toml
 home/.config/worktrunk/config.toml
 home/.config/yazi/yazi.toml      home/.config/yazi/keymap.toml
@@ -30,6 +31,30 @@ directories it seeds into. `~/.config` in particular is *shared*: `gcloud`, `gh`
 `git`, `zed`, `op`, `sops` and others write into it freely, and these are just a few
 symlinks alongside them. `~/.claude` is shared the same way, with far more at stake —
 every session, project and plugin Claude Code writes lives there.
+
+### The one file with a source of truth elsewhere
+
+`home/.config/mcc-lab/openbao-ca.pem` is the CA for the lab's OpenBao at
+`https://openbao.lab.mccarrell.org:8200` (mcc-lab/lab-infra#918). It is **public
+material** — a trust anchor, not a credential — so committing it grants nobody
+anything; the private half never leaves that cluster. What it buys is a machine that
+can verify OpenBao before it has any cluster access.
+
+Unlike the rest of the seed it can go **stale**: a rebuild of that cluster issues a
+new CA, and a stale anchor fails every call with a certificate error that reads as a
+broken server. `just refresh-openbao-ca` re-fetches it and writes only when it differs.
+
+**One-time, on a machine that already has this file by hand.** A real file where the
+symlink goes is a stow conflict, and a conflict aborts the *whole* plan — so `install`
+does not skip one file, it fails, and that is what `bin/daily` runs unattended:
+
+```sh
+rm ~/.config/mcc-lab/openbao-ca.pem
+just install        # from the MAIN checkout — see below
+```
+
+> `install` from a worktree points every seeded symlink into that worktree, and
+> removing it dangles the lot. `just status` catches it, after the fact.
 
 Install with [`just`](https://github.com/casey/just):
 
