@@ -165,6 +165,40 @@ profile-shell-startup runs="7":
       }
     ' "$trace" | sort -rn | head -n 20
 
+# OpenBao's CA, whose source of truth is the cluster: a rebuild there issues a new one
+# and a stale anchor fails every call with a certificate error (mcc-lab/lab-infra#918).
+#
+# Out of `install` like the claude-plugins recipes: it needs cluster access, and
+# `install` runs unattended from bin/daily.
+#
+# Validation is openssl, not grep. A truncated read carries BEGIN CERTIFICATE, so a text
+# match passes it and the anchor is overwritten with a fragment -- measured, it happened.
+
+# Re-fetch OpenBao's CA from the cluster; reports drift, writes only when it differs
+refresh-openbao-ca:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dest="home/.config/mcc-lab/openbao-ca.pem"
+    tmp="$(mktemp -t openbao-ca)"
+    trap 'rm -f "$tmp"' EXIT
+
+    kubectl -n cert-manager get secret openbao-ca -o jsonpath='{.data.tls\.crt}' \
+      | base64 -d > "$tmp"
+
+    openssl x509 -in "$tmp" -noout > /dev/null 2>&1 \
+      || { echo "refused: the cluster did not return a parseable certificate" >&2; exit 1; }
+    # openssl reads the first PEM block and ignores the rest, so a cert+key bundle parses.
+    ! grep -qi 'PRIVATE KEY' "$tmp" \
+      || { echo "refused: that bundle carries a private key -- seed the public half only" >&2; exit 1; }
+
+    if cmp -s "$tmp" "$dest"; then
+        echo "unchanged: $dest is the live CA"
+    else
+        cp "$tmp" "$dest"
+        echo "UPDATED $dest -- the CA rotated; commit this, then re-run \`just install\`"
+        openssl x509 -in "$dest" -noout -subject -dates
+    fi
+
 # Verify the seed is healthy: every seeded file is a symlink into this repo, and every
 # managed parent dir is a REAL dir, never folded into a symlink. Exit non-zero on any
 # failure. The seed list comes from git, so it never drifts.
@@ -180,7 +214,7 @@ status:
     # .config/yazi whatever `ya pkg add` downloads.
     for d in .claude .claude/hooks .claude/skills .claude/skills/python-via-uv \
              .config .config/direnv .config/ghostty .config/git \
-             .config/mise .config/worktrunk .config/yazi; do
+             .config/mcc-lab .config/mise .config/worktrunk .config/yazi; do
       t="{{home_dir}}/$d"
       if [ -L "$t" ]; then echo "✗ $d is a SYMLINK (folded!) — must be a real dir"; fail=1
       elif [ -d "$t" ]; then echo "✓ $d is a real dir"
