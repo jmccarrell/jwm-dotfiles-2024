@@ -1026,6 +1026,84 @@ jwm_uv_tools() {
     return "$status"
 }
 
+# Claude Desktop's built-in auto-updater is disabled, so this mirrors the manual
+# "grab the latest dmg from claude.ai and reinstall" flow. Checks the installed
+# version against the stable download-redirect endpoint first and skips the
+# 350MB+ download entirely when already current.
+#
+# Runs on the mark43 laptop too, where brew is restricted to formulae by the
+# Workbrew cask policy -- Claude Desktop is installed by hand there, not as a
+# cask, so nothing else would keep it current.
+#
+# The redirect endpoint is Cloudflare-fronted and undocumented, not a stable
+# API. If it starts failing, fall back to a manual download from claude.ai.
+jwm_update_claude_desktop() {
+    local app="/Applications/Claude.app"
+    if [ ! -d "$app" ]; then
+        echo "Claude.app not found in /Applications, skipping."
+        return 0
+    fi
+
+    local ua="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+    local redirect_url="https://claude.ai/api/desktop/darwin/universal/dmg/latest/redirect"
+    local dmg_url
+    dmg_url=$(curl -s -D - -o /dev/null -A "$ua" "$redirect_url" | awk 'tolower($1) ~ /^location:/{print $2}' | tr -d '\r')
+
+    if [ -z "$dmg_url" ]; then
+        echo "Could not resolve latest Claude Desktop download URL (endpoint may be blocked/changed), skipping."
+        return 1
+    fi
+
+    local current latest
+    current=$(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null)
+    latest=$(echo "$dmg_url" | grep -oE '/[0-9]+\.[0-9]+(\.[0-9]+)?/' | tr -d '/')
+
+    if [ "$current" = "$latest" ]; then
+        echo "Claude Desktop already up to date ($current)."
+        return 0
+    fi
+
+    echo "Updating Claude Desktop: $current -> $latest"
+
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+    local dmg_path="$tmp_dir/Claude.dmg"
+
+    if ! curl -sL -A "$ua" "$dmg_url" -o "$dmg_path"; then
+        echo "Download failed."
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    local mount_point
+    mount_point=$(hdiutil attach "$dmg_path" -nobrowse -noautoopen 2>/dev/null | grep -Eo '/Volumes/.*$' | tail -1)
+    if [ -z "$mount_point" ]; then
+        echo "Failed to mount the downloaded dmg (may not be a valid disk image), skipping."
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    local app_in_dmg
+    app_in_dmg=$(ls -d "$mount_point"/*.app 2>/dev/null | head -1)
+    if [ -z "$app_in_dmg" ]; then
+        echo "Could not find .app inside mounted dmg, skipping."
+        hdiutil detach "$mount_point" -quiet
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    osascript -e 'quit app "Claude"' >/dev/null 2>&1
+    sleep 1
+
+    rm -rf "$app"
+    ditto "$app_in_dmg" "$app"
+
+    hdiutil detach "$mount_point" -quiet
+    rm -rf "$tmp_dir"
+
+    echo "Claude Desktop updated: $current -> $latest"
+}
+
 # The chore list shared by `daily` (unattended, under launchd) and `bin/update`
 # (interactive) -- both in jwm-bin.
 jwm_update_tools() {
@@ -1050,6 +1128,9 @@ jwm_update_tools() {
     uv python upgrade || { UPDATE_FAILURES+=(uv-python); status=1; }
     jwm_uv_tools      || { UPDATE_FAILURES+=(uv-tools);  status=1; }
     rustup update     || { UPDATE_FAILURES+=(rustup);    status=1; }
+
+    jwm_update_claude_desktop \
+        || { UPDATE_FAILURES+=(claude-desktop); status=1; }
 
     jwm_refresh_completions || { UPDATE_FAILURES+=(completions); status=1; }
     jwm_refresh_shell_init  || { UPDATE_FAILURES+=(shell-init);  status=1; }
