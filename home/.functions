@@ -996,9 +996,15 @@ jwm_brew_bundle() {
 # `uv tool upgrade` refuses a tool installed with an exact version pin, telling
 # you to reinstall with @latest. Nothing here pins, and brew bundle installs
 # unpinned, so that only bites a tool pinned by hand.
+#
+# private names tools from a private package index. A Brewfile uv line cannot
+# carry an index, so brew bundle would install them from PyPI, where the name
+# may belong to a stranger. They are installed by hand (lab-infra runbook 998)
+# and upgraded here only where present; uv reuses the index from the receipt.
 jwm_uv_tools() {
     local status=0
-    local t='' declared='' extra=''
+    local t='' declared='' installed='' extra=''
+    local -a private=( mcc-labctl )
 
     command -v uv > /dev/null || return 0
 
@@ -1018,8 +1024,17 @@ jwm_uv_tools() {
 
     # `uv tool list` indents each tool's executables under its name; the tool
     # names are the unindented lines, first field.
-    extra=$(uv tool list 2>/dev/null | awk '/^[^ -]/ { print $1 }' | sort -u \
-                | comm -23 - <(printf '%s\n' "$declared"))
+    installed=$(uv tool list 2>/dev/null | awk '/^[^ -]/ { print $1 }' | sort -u)
+
+    for t in "${private[@]}"; do
+        grep -qxF "$t" <<< "$installed" || continue
+        uv tool upgrade "$t" || status=1
+        declared+=$'\n'"$t"
+    done
+
+    # Names in installed but in neither list; comm needs both inputs sorted.
+    extra=$(comm -23 <(printf '%s\n' "$installed") \
+                     <(printf '%s\n' "$declared" | sort -u))
     [ -n "$extra" ] && printf 'jwm_uv_tools: installed but not declared: %s\n' \
                               "$(printf '%s' "$extra" | tr '\n' ' ')"
 
