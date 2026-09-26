@@ -1031,9 +1031,8 @@ jwm_uv_tools() {
 # version against the stable download-redirect endpoint first and skips the
 # 350MB+ download entirely when already current.
 #
-# Runs on the mark43 laptop too, where brew is restricted to formulae by the
-# Workbrew cask policy -- Claude Desktop is installed by hand there, not as a
-# cask, so nothing else would keep it current.
+# mark43 only: Workbrew's cask policy means Claude Desktop is installed by hand
+# there. Elsewhere it is the `claude` cask, which `brew upgrade` keeps current.
 #
 # The redirect endpoint is Cloudflare-fronted and undocumented, not a stable
 # API. If it starts failing, fall back to a manual download from claude.ai.
@@ -1129,8 +1128,10 @@ jwm_update_tools() {
     jwm_uv_tools      || { UPDATE_FAILURES+=(uv-tools);  status=1; }
     rustup update     || { UPDATE_FAILURES+=(rustup);    status=1; }
 
-    jwm_update_claude_desktop \
-        || { UPDATE_FAILURES+=(claude-desktop); status=1; }
+    if mark43_host_p; then
+        jwm_update_claude_desktop \
+            || { UPDATE_FAILURES+=(claude-desktop); status=1; }
+    fi
 
     jwm_refresh_completions || { UPDATE_FAILURES+=(completions); status=1; }
     jwm_refresh_shell_init  || { UPDATE_FAILURES+=(shell-init);  status=1; }
