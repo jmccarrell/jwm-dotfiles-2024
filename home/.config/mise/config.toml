@@ -47,6 +47,11 @@
 # only in shells that sourced something.
 disable_tools = ["python"]
 
+# Emacs's mise package turns this on itself, via `mise settings set`, when it finds
+# it off -- which would edit this file through the stow symlink. Set here so the
+# change is reviewed. It also enables mise's experimental features on both macs.
+experimental = true
+
 [tools]
 # `lts` rather than a pinned patch, matching the `nodejs lts` this replaces. mise
 # records the alias, not the resolution -- `mise use -g --pin` freezes a version if
