@@ -1032,6 +1032,7 @@ jwm_uv_tools() {
         declared+=$'\n'"$t"
     done
 
+    # Names in installed but in neither list; comm needs both inputs sorted.
     extra=$(comm -23 <(printf '%s\n' "$installed") \
                      <(printf '%s\n' "$declared" | sort -u))
     [ -n "$extra" ] && printf 'jwm_uv_tools: installed but not declared: %s\n' \
