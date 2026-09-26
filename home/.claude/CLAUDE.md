@@ -43,6 +43,13 @@ Emacs Lisp's `;;; file.el --- ...` header and footer are that language's own
 convention, not block headers; in a literate config the org heading already is
 the section header.
 
+Never state how many members a growing set has — "the ten passwords", "five of
+the eight", "all three repos". The number tells the reader nothing the list beside
+it doesn't, and every routine addition then has to edit prose far from the change.
+Name the set instead ("the managed-role passwords", "every repo here"). This holds
+for docs and READMEs as well as comments. A number that is itself the fact — a
+quorum, a limit, a replica count — stays.
+
 This applies to code I write, in any repo; I don't convert existing comments
 unless asked.
 
