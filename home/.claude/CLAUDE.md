@@ -14,6 +14,21 @@ Primary: Python, Emacs Lisp, Shell/Bash
 - Emacs Lisp: functions and variables use the `jwm/` prefix; package management via `use-package`
 - Shell: prefer bash version 5; POSIX-compatible where portability matters
 
+## Generated passwords
+
+Generate a password with `openssl rand -base64 18`, trailing newline stripped:
+
+```sh
+P=$(openssl rand -base64 18 | tr -d '\n')       # a script consumes it
+openssl rand -base64 18 | tr -d '\n' | pbcopy   # a person pastes it into a web UI
+```
+
+Never hand me a username or password to carry between systems. Give me one bash
+script that generates the value, holds it in a variable, writes the username and
+password to every store and consumer itself, and proves each write by reading
+back and comparing — never by printing. The value stays out of argv and shell
+history: pass it on stdin or in the environment, not as a command argument.
+
 ## Comments
 
 Comments are concise: state the constraint and the surprise, not the
