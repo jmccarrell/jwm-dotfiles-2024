@@ -54,6 +54,13 @@ function jwm_standard_paths() {
     else
         standard_paths=("/usr/local/bin" "/usr/bin" "/bin")
     fi
+    # then /etc/paths.d/* in glob order, as path_helper reads them: installers
+    # we don't control drop their bin dirs there (Intune puts /opt/mark43/bin
+    # in /etc/paths.d/wiggum). jwm_set_path drops the entries that don't exist.
+    local f
+    for f in /etc/paths.d/*; do
+        [[ -f $f && -r $f ]] && mapfile -t -O "${#standard_paths[@]}" standard_paths < "$f"
+    done
     (( ${#standard_paths[@]} )) && printf "%s\n" "${standard_paths[@]}"
 }
 
