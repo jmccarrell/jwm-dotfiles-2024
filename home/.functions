@@ -916,7 +916,7 @@ jwm_refresh_completions() {
     command -v uv   > /dev/null && uv generate-shell-completion bash    > "$d/uv"
     command -v ruff > /dev/null && ruff generate-shell-completion bash  > "$d/ruff"
     command -v mise > /dev/null && mise completion bash                 > "$d/mise"
-    command -v wiggum > /dev/null && _WIGGUM_COMPLETE=bash_source wiggum > "$d/wiggum"
+    command -v wiggum > /dev/null && wiggum completion --shell bash      > "$d/wiggum"
 
     printf 'bash completions refreshed in %s\n' "$d"
 }
