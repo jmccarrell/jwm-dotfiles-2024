@@ -110,18 +110,21 @@ Claude may do these without asking:
 - create feature worktrees and branches (`wt switch --create <slug>`)
 - commit on feature branches (amend only commits that haven't been pushed)
 - push feature branches (never push main; never use `--force`)
-- manage issues and PRs: `gh` for GitHub repos, `tea` for Forgejo-hosted repos —
-  but **open every PR as `mcc-lab-agent`**, never as Jeff: GitHub will not let the
-  author approve their own PR, so a PR opened under Jeff's login has to be closed
-  and reopened (n100tickers #90 → #91); the lab repos hold the same convention on
-  Forgejo (lab-infra #290). That is
+- manage issues and PRs: `gh` for GitHub repos, `tea` for Forgejo-hosted repos.
+  **On Lyra, for Jeff's personal work, open every PR as `mcc-lab-agent`**, never
+  as Jeff: GitHub will not let the author approve their own PR, so a PR opened
+  under Jeff's login has to be closed and reopened (n100tickers #90 → #91); the
+  lab repos hold the same convention on Forgejo (lab-infra #290). That is
   `GH_TOKEN=$(lab-gh-token) gh pr create ...` on GitHub and
-  `tea pulls create -l mcc-lab-agent` on Forgejo. It applies wherever the
-  `mcc-lab-agent` app is installed, which includes Jeff's personal GitHub repos,
-  not only the `mcc-lab` org. Only the PR *poster* is constrained: commits, pushes
+  `tea pulls create -l mcc-lab-agent` on Forgejo. It covers every repo where the
+  `mcc-lab-agent` app is installed, including Jeff's personal GitHub repos, not
+  only the `mcc-lab` org. Only the PR *poster* is constrained: commits, pushes
   and comments stay Jeff's. The installation token answers 403 to `gh api user` and
   reports `push=false` even where it can write, so attempt the create and read the
-  error rather than preflighting
+  error rather than preflighting.
+  `lab-gh-token` exists only on Lyra and never applies to Mark43 work. On the
+  Mark43 work Mac, open PRs as the logged-in user — even for Jeff's personal
+  repos — and don't look for the token or report its absence
 - after Jeff merges a PR: `wt remove <slug>` for the branch Claude created —
   and the remote branch too, if Claude created it and the host didn't already
   auto-delete it — provided nothing outside the repo depends on that checkout
