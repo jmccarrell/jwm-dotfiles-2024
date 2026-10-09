@@ -533,6 +533,10 @@ gs_jwm_bin() {
     git_sync "$(jwm_dir)/proj/jwm-bin" origin
 }
 
+gs_jwm_pdata() {
+    git_sync "${HOME}/pdata" origin
+}
+
 gs_jwm_pdata_notes() {
     git_sync "${HOME}/pdata/notes" origin
 }
@@ -645,6 +649,7 @@ gs_jwm_host() {
     local status=0
     gs_todo             || { GS_FAILURES+=(todo);             status=1; }
     gs_notes            || { GS_FAILURES+=(notes);            status=1; }
+    gs_jwm_pdata        || { GS_FAILURES+=(jwm_pdata);        status=1; }
     gs_jwm_pdata_notes  || { GS_FAILURES+=(jwm_pdata_notes);  status=1; }
     gs_ebooks           || { GS_FAILURES+=(ebooks);           status=1; }
     gs_lab              || { GS_FAILURES+=(lab);              status=1; }
