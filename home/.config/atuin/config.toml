@@ -1,0 +1,6 @@
+# The settings folke and omerxx both run: a compact panel under the prompt,
+# and Enter runs the chosen command. Homebrew and mise handle upgrades.
+style = "compact"
+inline_height = 20
+enter_accept = true
+update_check = false
