@@ -9,6 +9,8 @@ Run `keys` to show this page.
 - **Tab** instead of Enter puts it on the line to edit first. **New**
 - **Ctrl-R again** inside the search narrows it: all hosts, this host, this
   session, this directory. "What did I run here last time?" **New**
+- **?** at an empty prompt asks Atuin AI for a command in plain English;
+  **Enter** runs it, **Tab** inserts it. **New**
 
 ## Put a file or path into a command
 

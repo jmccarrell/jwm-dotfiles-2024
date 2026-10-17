@@ -68,7 +68,9 @@ fi;
 # clobbering the PATH jwm_set_path built above.
 command -v mise &> /dev/null && eval "$(mise activate bash)"
 
-# Set up fzf key bindings and fuzzy completion
+# Set up fzf key bindings and fuzzy completion. Ctrl-R belongs to Atuin (below);
+# an empty FZF_CTRL_R_COMMAND is fzf's opt-out, read when the init is sourced.
+FZF_CTRL_R_COMMAND=
 command -v fzf &> /dev/null && jwm_shell_init fzf
 
 # set up direnv
@@ -128,4 +130,21 @@ fi
 vault_rc=${HOME}/.vaultrc
 if [ -e ${vault_rc} ]; then
     source ${vault_rc}
+fi
+
+# Atuin owns Ctrl-R. Loads last: its bundled bash-preexec must wrap the
+# PROMPT_COMMAND set above. The cached init bakes in some of Atuin's config, so
+# rerun jwm_refresh_shell_init after editing it.
+#
+# bash-preexec turns ignoreboth into ignoredups (it reads commands back with
+# `history 1`), so space-prefixed commands are dropped from bash history here
+# instead; Atuin skips them itself.
+if command -v atuin &> /dev/null; then
+    jwm_shell_init atuin
+    __jwm_drop_space_history() {
+        local last
+        last=$(HISTTIMEFORMAT='' builtin history 1)
+        [[ $last =~ ^\ *[0-9]+\*?\ \ \  ]] && builtin history -d -1
+    }
+    precmd_functions+=(__jwm_drop_space_history)
 fi
