@@ -1162,3 +1162,10 @@ jwm_update_tools() {
 #
 # end jeffs functions
 #
+
+# Show shell-search-patterns.md, which sits beside the stowed dotfiles.
+keys() {
+    local f
+    f="$(dirname "$(dirname "$(realpath ~/.functions)")")/shell-search-patterns.md"
+    if command -v bat &> /dev/null; then bat --style=plain "$f"; else less "$f"; fi
+}
