@@ -20,3 +20,7 @@ quick-terminal-position = top
 quick-terminal-animation-duration = 0.2
 quick-terminal-autohide = true
 # quick-terminal-screen defaults to `mouse` — fine for laptop + external display setups.
+
+# Left Option sends Alt, so fzf's Alt-C and Atuin's Alt-1..9 work; right
+# Option still types accented characters.
+macos-option-as-alt = left
