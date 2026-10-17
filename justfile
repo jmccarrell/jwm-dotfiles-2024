@@ -43,7 +43,20 @@ stow-pkg target pkg *flags:
 # repo root was seeded into $HOME until someone remembered to extend it.
 
 # Install all dotfiles
-install: (stow-pkg home_dir "home")
+install: atuin-config-aside (stow-pkg home_dir "home")
+
+# Atuin writes a default ~/.atuin/config.toml on first run when none exists, and a
+# real file there is a stow conflict that aborts the whole install. Move it aside;
+# the repo copy carries the same defaults.
+[private]
+atuin-config-aside:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    f="{{home_dir}}/.atuin/config.toml"
+    if [[ -f "$f" && ! -L "$f" ]]; then
+        mv "$f" "$f.atuin-default"
+        echo "moved Atuin's own $f to $f.atuin-default"
+    fi
 
 # -S and verbose where `install` is -R and quiet: a preview only has to read as
 # "nothing to do" or "something to do" at a glance. The cost is that it cannot show a
