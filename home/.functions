@@ -798,7 +798,7 @@ declare -A JWM_SHELL_INIT_CMDS=(
     [zoxide]="zoxide init bash"
     [direnv]="direnv hook bash"
     [fzf]="fzf --bash"
-    [atuin]="atuin init bash --disable-up-arrow --disable-ai"
+    [atuin]="atuin init bash --disable-up-arrow"
     [wt]="command wt config shell init bash"
     [brewenv]='"$(jwm_brew_cmd)" shellenv'
 )

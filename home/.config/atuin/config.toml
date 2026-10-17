@@ -4,3 +4,7 @@ style = "compact"
 inline_height = 20
 enter_accept = true
 update_check = false
+
+# Atuin AI: `?` at an empty prompt. Signs in to Atuin Hub on first use.
+[ai]
+enabled = true
