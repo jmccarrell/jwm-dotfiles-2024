@@ -143,4 +143,8 @@ alias k9p='k9s -c pulse'
 # git worktree aliases
 alias gwt-list='git worktree list'
 
+# Atuin scripts hold short snippets only; real scripts stay as files in git.
+# Unguarded: on anvil mise puts atuin on PATH after this file is sourced.
+alias asr='atuin scripts run'
+
 # jwm-end

@@ -30,6 +30,19 @@ Run `keys` to show this page.
 Words are fuzzy and order-free. Add `'word` for exact, `^start`, `end$`,
 `!exclude`, and `a | b` for either.
 
+## Save a short command to rerun on any host
+
+- Run it, then `atuin scripts new <name> --last`: your editor opens with that
+  command. Change a value to `{{ ns }}` to make it a variable, and save. It
+  syncs with history. **New**
+- `asr <name>` runs it and asks for each variable; `-v ns=flux-system` skips
+  the question.
+- `atuin scripts list` shows them; `atuin scripts edit <name>` changes one.
+- Example: `kubectl get pods -n flux-system`, then `atuin scripts new pods --last`,
+  change `flux-system` to `{{ ns }}`; later, `asr pods`.
+
+Short, non-interactive commands only; real scripts stay as files in git.
+
 ## Keep a command out of history
 
 Start it with a space.
