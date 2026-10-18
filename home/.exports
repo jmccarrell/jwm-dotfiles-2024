@@ -24,10 +24,6 @@ command -v bat &> /dev/null &&
 command -v tree &> /dev/null &&
     export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -200'"
 
-# Atuin syncs history to the lab server from lyra and anvil only; anywhere else
-# history stays local. AI is off only on the Mark43 Mac. Atuin bakes AI into its
-# cached init, so run jwm_refresh_shell_init after changing it.
-case "${HOSTNAME%%.*}" in
-    lyra|anvil) export ATUIN_SYNC_ADDRESS='https://atuin-server.lab.mccarrell.org' ;;
-esac
+# Atuin AI is off only on the Mark43 Mac. Atuin bakes AI into its cached init, so
+# run jwm_refresh_shell_init after changing it.
 mark43_host_p && export ATUIN_AI__ENABLED=false
