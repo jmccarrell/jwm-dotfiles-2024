@@ -32,11 +32,14 @@ Words are fuzzy and order-free. Add `'word` for exact, `^start`, `end$`,
 
 ## Save a short command to rerun on any host
 
-- Run it once, then `atuin scripts new <name> --last --no-edit`. It syncs
-  with history. **New**
-- `asr <name>` runs it. `asr <name> -v ns=flux` fills `{{ ns }}` in it.
-- Example: `kubectl get pods -A | grep -v Running`, then
-  `atuin scripts new badpods --last --no-edit`; later, `asr badpods`.
+- Run it, then `atuin scripts new <name> --last`: your editor opens with that
+  command. Change a value to `{{ ns }}` to make it a variable, and save. It
+  syncs with history. **New**
+- `asr <name>` runs it and asks for each variable; `-v ns=flux-system` skips
+  the question.
+- `atuin scripts list` shows them; `atuin scripts edit <name>` changes one.
+- Example: `kubectl get pods -n flux-system`, then `atuin scripts new pods --last`,
+  change `flux-system` to `{{ ns }}`; later, `asr pods`.
 
 Short, non-interactive commands only; real scripts stay as files in git.
 
