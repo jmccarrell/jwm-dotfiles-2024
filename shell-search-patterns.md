@@ -30,6 +30,16 @@ Run `keys` to show this page.
 Words are fuzzy and order-free. Add `'word` for exact, `^start`, `end$`,
 `!exclude`, and `a | b` for either.
 
+## Save a short command to rerun on any host
+
+- Run it once, then `atuin scripts new <name> --last --no-edit`. It syncs
+  with history. **New**
+- `asr <name>` runs it. `asr <name> -v ns=flux` fills `{{ ns }}` in it.
+- Example: `kubectl get pods -A | grep -v Running`, then
+  `atuin scripts new badpods --last --no-edit`; later, `asr badpods`.
+
+Short, non-interactive commands only; real scripts stay as files in git.
+
 ## Keep a command out of history
 
 Start it with a space.
