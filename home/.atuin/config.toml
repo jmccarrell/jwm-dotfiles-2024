@@ -1,6 +1,6 @@
 # Atuin's generated default config, with our settings uncommented. Atuin reads
-# ~/.atuin/config.toml ahead of ~/.config/atuin/config.toml. Per-host settings
-# (sync server, AI off on the Mark43 Mac) are ATUIN_* variables in ~/.exports.
+# ~/.atuin/config.toml ahead of ~/.config/atuin/config.toml. AI off on the Mark43
+# Mac is an ATUIN_* variable in ~/.exports.
 
 ## date format used, either "us" or "uk"
 # dialect = "us"
@@ -25,6 +25,10 @@ update_check = false
 
 ## address of the sync server
 # sync_address = "https://api.atuin.sh"
+# History syncs only to the lab server. Here rather than in the environment, so no
+# Atuin process falls back to Atuin Hub, whose sign-in is for AI alone. A host that
+# never logs in to the lab server (the Mark43 Mac) keeps its history local.
+sync_address = "https://atuin-server.lab.mccarrell.org"
 
 ## how often to sync history. note that this is only triggered when a command
 ## is ran, so sync intervals may well be longer
