@@ -68,6 +68,26 @@ quorum, a limit, a replica count — stays.
 This applies to code I write, in any repo; I don't convert existing comments
 unless asked.
 
+## Tests
+
+Tests should be minimal and targeted: assert only facts that are actually in question.
+A good test guards a regression that would otherwise go unnoticed (still renders,
+syncs, deploys and reports Healthy) and that the change is actually about. Avoid
+tautological tests:
+
+- Don't restate configuration (e.g. asserting a `values.yaml` value renders as itself)
+- Don't assert things the change doesn't touch (e.g. Deployment selectors, network
+  mode, unchanged pins)
+- Don't test transient states a follow-up change tears down (e.g. step 1 of a
+  two-step upgrade)
+- Don't test failures that are already loud (e.g. an immutable-field sync error)
+
+Prefer 1-3 assertions per change and collapse repetition (e.g. helm-unittest
+`templates:` with `matchRegex`). Confirm each test catches its failure by removing
+the guarded value and watching it fail. One-time verification (render diffs,
+post-deploy checks) belongs in the PR description, not in permanent tests. Don't
+list test counts (e.g. "12/12 pass") in PR descriptions.
+
 ## Git repos and worktrees
 
 Jeff's repos are **plain clones** — `git clone` into a standard tree and work at the
