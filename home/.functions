@@ -1149,6 +1149,11 @@ jwm_update_tools() {
     jwm_uv_tools      || { UPDATE_FAILURES+=(uv-tools);  status=1; }
     rustup update     || { UPDATE_FAILURES+=(rustup);    status=1; }
 
+    # An alias such as node = "lts" moves to a new major with no config change,
+    # and no other step here installs it. --global keeps `update` run from
+    # inside a project from also upgrading that project's tools.
+    mise upgrade --global || { UPDATE_FAILURES+=(mise); status=1; }
+
     if mark43_host_p; then
         jwm_update_claude_desktop \
             || { UPDATE_FAILURES+=(claude-desktop); status=1; }
