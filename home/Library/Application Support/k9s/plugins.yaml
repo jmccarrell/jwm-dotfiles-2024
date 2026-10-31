@@ -1,0 +1,20 @@
+plugins:
+  # Pods per zone for the selected workload. Pods are joined to their node's zone
+  # label; a pending pod has no node yet and counts under a blank zone.
+  zone-spread:
+    shortCut: Shift-Z
+    description: Pods per zone
+    scopes: [deployments, statefulsets, daemonsets]
+    command: bash
+    background: false
+    args:
+      - -c
+      - |
+        sel=$(kubectl --context "$CONTEXT" -n "$NAMESPACE" get "$RESOURCE_NAME" "$NAME" -o json \
+          | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')
+        awk 'NR==FNR { z[$1] = $2; next } { c[z[$1]]++ } END { for (k in c) print k, c[k] }' \
+          <(kubectl --context "$CONTEXT" get nodes --no-headers \
+              -o custom-columns='N:.metadata.name,Z:.metadata.labels.topology\.kubernetes\.io/zone') \
+          <(kubectl --context "$CONTEXT" -n "$NAMESPACE" get pods -l "$sel" --no-headers \
+              -o custom-columns=N:.spec.nodeName) | sort
+        read -rsn1 -p "press any key"

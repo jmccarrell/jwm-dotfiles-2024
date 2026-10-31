@@ -211,10 +211,12 @@ status:
     # .claude every Claude session, project and plugin; .claude/skills whatever
     # `claude plugin init` scaffolds there; .config/mise the conf.d/*.toml carrying
     # machine-local tool versions, which is the whole point of it being machine-local;
-    # .config/yazi whatever `ya pkg add` downloads.
+    # .config/yazi whatever `ya pkg add` downloads. Library/Application Support/k9s
+    # holds k9s's per-cluster state and its log.
     for d in .claude .claude/hooks .claude/skills .claude/skills/python-via-uv \
              .config .config/direnv .config/ghostty .config/git \
-             .config/mcc-lab .config/mise .config/worktrunk .config/yazi; do
+             .config/mcc-lab .config/mise .config/worktrunk .config/yazi \
+             Library "Library/Application Support" "Library/Application Support/k9s"; do
       t="{{home_dir}}/$d"
       if [ -L "$t" ]; then echo "✗ $d is a SYMLINK (folded!) — must be a real dir"; fail=1
       elif [ -d "$t" ]; then echo "✓ $d is a real dir"
