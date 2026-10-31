@@ -19,7 +19,11 @@ home/.config/mcc-lab/openbao-ca.pem  -> ~/.config/mcc-lab/openbao-ca.pem
 home/.config/mise/config.toml    home/.config/uv/uv.toml
 home/.config/worktrunk/config.toml
 home/.config/yazi/yazi.toml      home/.config/yazi/keymap.toml
+home/Library/Application Support/k9s/views.yaml  plugins.yaml
 ```
+
+k9s on macOS reads `~/Library/Application Support/k9s`, not `~/.config/k9s`, unless
+`XDG_CONFIG_HOME` or `K9S_CONFIG_DIR` is set; `k9s info` prints the paths it uses.
 
 `home/` is the only stow package, so the repo root is free: `justfile`, `README.md`,
 the repo-local `.claude/`, an untracked `TASK.md` — none of it can reach `$HOME`.
