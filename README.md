@@ -127,12 +127,19 @@ work skills nothing else provided.
 
 ## Git identity
 
-Shared Git config uses three layers:
+Shared Git config uses these layers:
 
 - `home/.gitconfig` is the tracked base config.
 - `home/.gitconfig.personal` is the tracked override for repos under `~/jwm`.
 - `home/.gitconfig.machine` is an untracked per-machine file that sets the default
   email.
+
+- `home/.gitconfig.agent` and `home/.gitconfig.agent-github` are the bot identity for Claude
+  Code agent sessions on lyra. Git reads them only when `GIT_CONFIG_GLOBAL` points at
+  `~/.gitconfig.agent`, which lyra's `~/.claude/settings.json` sets for agent sessions alone; the
+  file includes `~/.gitconfig`, so everything but the identity and the push credentials stays
+  Jeff's. Seeded everywhere and harmless elsewhere: no other machine sets the variable
+  (mcc-lab/lab-infra#1437).
 
 Create `home/.gitconfig.machine` before installing the dotfiles.
 

@@ -1,0 +1,45 @@
+# Git config for Claude Code agent sessions on lyra: commit and push as the mcc-lab-agent
+# bot instead of as Jeff (mcc-lab/lab-infra#1437). Read only when GIT_CONFIG_GLOBAL points
+# here, which lyra's ~/.claude/settings.json sets for agent sessions alone; Jeff's terminal,
+# and every other machine, never reads this file.
+#
+# A default, not a fence: the forges' branch rules are what refuse a bot push to main.
+
+# Everything else stays Jeff's: aliases, diff settings, the machine file.
+[include]
+	path = ~/.gitconfig
+
+# Forgejo, and anything that is not GitHub.
+[user]
+	name = mcc-lab-agent
+	email = mcc-lab-agent@lab.mccarrell.org
+
+# Matched on the remote URL as written, before insteadOf rewrites it. `:**` would not match
+# `git@github.com:owner/repo`; `**` is special only next to `/`.
+[includeIf "hasconfig:remote.*.url:git@github.com:*/**"]
+	path = ~/.gitconfig.agent-github
+[includeIf "hasconfig:remote.*.url:https://github.com/**"]
+	path = ~/.gitconfig.agent-github
+[includeIf "hasconfig:remote.*.url:gh:*/**"]
+	path = ~/.gitconfig.agent-github
+
+# Both forges over HTTPS, so pushes use the bot's token and never Jeff's SSH key.
+[url "https://github.com/"]
+	insteadOf = git@github.com:
+	insteadOf = ssh://git@github.com/
+# Longer than ~/.gitconfig's `gh:` rule, which would otherwise win and push over SSH.
+[url "https://github.com/jmccarrell/"]
+	insteadOf = gh:jmccarrell/
+[url "https://forgejo.lab.mccarrell.org/"]
+	insteadOf = git@forgejo.lab.mccarrell.org:
+	insteadOf = ssh://git@forgejo.lab.mccarrell.org/
+
+# The empty helper clears the list first. Without it Homebrew's system osxkeychain answers
+# before the bot helper: on GitHub it stores the 1-hour token and replays it after expiry;
+# on Forgejo it holds a lab-artifact-ci login.
+[credential "https://github.com"]
+	helper =
+	helper = lab-gh
+[credential "https://forgejo.lab.mccarrell.org"]
+	helper =
+	helper = lab-forgejo
