@@ -1,0 +1,5 @@
+# The bot's GitHub identity, included by ~/.gitconfig.agent for GitHub remotes. 319506792 is
+# the mcc-lab-agent[bot] user id, not the App id; GitHub links commits to the bot by it.
+[user]
+	name = mcc-lab-agent[bot]
+	email = 319506792+mcc-lab-agent[bot]@users.noreply.github.com
