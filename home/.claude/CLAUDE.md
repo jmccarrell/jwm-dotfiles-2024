@@ -138,13 +138,18 @@ Claude may do these without asking:
   `GH_TOKEN=$(lab-gh-token) gh pr create ...` on GitHub and
   `tea pulls create -l mcc-lab-agent` on Forgejo. It covers every repo where the
   `mcc-lab-agent` app is installed, including Jeff's personal GitHub repos, not
-  only the `mcc-lab` org. Only the PR *poster* is constrained: commits, pushes
-  and comments stay Jeff's. The installation token answers 403 to `gh api user` and
+  only the `mcc-lab` org. On Lyra, agent sessions also **commit and push as the
+  bot**, with no step per command: Claude Code's settings point `GIT_CONFIG_GLOBAL` at
+  `~/.gitconfig.agent`. Never route around it (no `env -u GIT_CONFIG_GLOBAL`, no SSH push
+  URL, no `-c user.email=`). Both forges refuse a bot push to `main`, and Forgejo also
+  refuses a bot merge; on GitHub an approved PR could still be merged by the App, so
+  merging stays Jeff's by this rule. Issue and PR **comments stay Jeff's** (`tea -l jmccarrell`,
+  plain `gh`). The installation token answers 403 to `gh api user` and
   reports `push=false` even where it can write, so attempt the create and read the
   error rather than preflighting.
   `lab-gh-token` exists only on Lyra and never applies to Mark43 work. On the
-  Mark43 work Mac, open PRs as the logged-in user — even for Jeff's personal
-  repos — and don't look for the token or report its absence
+  Mark43 work Mac, open PRs, commit and push as the logged-in user — even for
+  Jeff's personal repos — and don't look for the token or report its absence
 - after Jeff merges a PR: `wt remove <slug>` for the branch Claude created —
   and the remote branch too, if Claude created it and the host didn't already
   auto-delete it — provided nothing outside the repo depends on that checkout
