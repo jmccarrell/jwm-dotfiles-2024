@@ -1,0 +1,61 @@
+# pr-agent review through OpenRouter (mcc-lab/lab#43). The key's OpenRouter
+# guardrail allows zero-data-retention providers only.
+#
+# This repo is public: pull_request, never pull_request_target, so a fork's PR
+# gets no secrets and is skipped rather than handed the key.
+name: pr-agent
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  review:
+    # No sender.type != 'Bot' filter: mcc-lab-agent[bot] opens most PRs here.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Skip diffs too large to review
+        id: size
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          # ~20k tokens, leaving room in max_model_tokens for the prompt and output.
+          MAX_DIFF_BYTES: 80000
+        run: |
+          set -euo pipefail
+          # GitHub refuses to render very large diffs; that counts as too large.
+          bytes=$(gh api -H 'Accept: application/vnd.github.diff' \
+                "repos/$GITHUB_REPOSITORY/pulls/$PR" | wc -c) || bytes=unknown
+          if [[ $bytes == unknown ]] || (( bytes > MAX_DIFF_BYTES )); then
+            gh pr comment "$PR" -R "$GITHUB_REPOSITORY" \
+              --body "pr-agent: this diff is too large to review ($bytes bytes, limit $MAX_DIFF_BYTES)."
+            echo skip=true >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: pr-agent
+        if: steps.size.outputs.skip != 'true'
+        uses: docker://pragent/pr-agent:0.50.0-github_action@sha256:548e894a88071180832b2f4233f734d0acd0db1a879e2fcbaa70bac8b8372ebe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER__KEY: ${{ secrets.OPENROUTER_KEY }}
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_review: "true"
+          github_action_config.auto_improve: "true"
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
+          config.ignore_pr_authors: '["^renovate"]'
+          # Provisional until mcc-lab/lab#54 picks the model.
+          config.model: openrouter/openai/gpt-oss-120b
+          config.fallback_models: "[]"
+          config.custom_model_max_tokens: "128000"
+          config.max_model_tokens: "32000"
+          config.max_output_tokens: "4000"
+          config.ai_timeout: "90"
+          config.reasoning_effort: low
+          config.output_run_details: "true"
