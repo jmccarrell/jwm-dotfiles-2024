@@ -45,7 +45,8 @@ def parse_worktree_path(tokens):
 def resolve_base(cmd: str, payload: dict) -> str:
     """Honor `cd <dir> &&` prefixes so relative worktree paths resolve correctly."""
     base = payload.get("cwd") or os.getcwd()
-    segments = re.split(r"&&", cmd)
+    # `;` chains a cd as surely as `&&` does.
+    segments = re.split(r"&&|;", cmd)
     for seg in segments:
         if "git" in seg and "worktree" in seg and "add" in seg:
             break
