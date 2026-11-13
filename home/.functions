@@ -951,21 +951,21 @@ jwm_brewfiles() {
 # goes red the day any entry drifts a version on a machine where nothing is
 # absent.
 #
-# Only `tap`, `brew` and `uv` lines are fed to it. install accepts no --no-cask
-# or --no-npm (they are dump-only flags), so the filter is the mechanism rather
-# than a preference: a cask install prompts and launchd cannot answer, and brew
-# reads npm globals from whichever node is active, which mise moves. The host
-# files still record both so they can provision a replacement mac; the nightly
-# job just does not act on them.
+# Every line is installed, casks included. A cask that cannot install
+# unattended fails the run and is reported; it must never stall it, so:
+#  - HOMEBREW_NO_SUDO fails a cask that needs root at once rather than
+#    prompting for a password. Workbrew's setuid brew passes it through.
+#  - stdin is /dev/null, so nothing else waits on a keyboard.
+#  - timeout bounds each Brewfile, for an installer that blocks on a GUI
+#    dialog. Without --foreground it signals brew's whole process group.
 #
-# uv is in that list because brew bundle installs a missing uv tool correctly and
-# idempotently, the `with:` extras form included -- a second run reports Using.
-# It will not UPGRADE one; that is what jwm_uv_tools exists for.
+# A uv line installs a missing tool but will not UPGRADE one; that is what
+# jwm_uv_tools exists for.
 #
 # Never `brew bundle cleanup` -- it uninstalls everything absent from the file.
 jwm_brew_bundle() {
     local status=0
-    local f='' tmp=''
+    local f=''
     local -a files=()
 
     while IFS= read -r f; do files+=( "$f" ); done < <(jwm_brewfiles)
@@ -975,10 +975,10 @@ jwm_brew_bundle() {
             printf 'jwm_brew_bundle: %s unreadable\n' "$f" >&2
             status=1; continue
         }
-        tmp="$(mktemp -t brewfile)" || { status=1; continue; }
-        awk '/^(tap|brew|uv) /' "$f" > "$tmp"
-        HOMEBREW_NO_AUTO_UPDATE=1 brew bundle install --file="$tmp" --no-upgrade || status=1
-        rm -f "$tmp"
+        HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_SUDO=1 \
+            timeout --kill-after=1m 30m \
+            brew bundle install --file="$f" --no-upgrade < /dev/null \
+            || { printf 'jwm_brew_bundle: %s failed (exit %d)\n' "$f" "$?" >&2; status=1; }
     done
 
     return "$status"
