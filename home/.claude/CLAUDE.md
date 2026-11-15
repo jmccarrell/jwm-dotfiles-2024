@@ -133,8 +133,8 @@ Claude may do these without asking:
 - manage issues and PRs: `gh` for GitHub repos, `tea` for Forgejo-hosted repos.
   **On Lyra, for Jeff's personal work, open every PR as `mcc-lab-agent`**, never
   as Jeff: GitHub will not let the author approve their own PR, so a PR opened
-  under Jeff's login has to be closed and reopened (n100tickers #90 → #91); the
-  lab repos hold the same convention on Forgejo (lab-infra #290). That is
+  under Jeff's login has to be closed and reopened; the lab repos hold the same
+  convention on Forgejo. That is
   `GH_TOKEN=$(lab-gh-token) gh pr create ...` on GitHub and
   `tea pulls create -l mcc-lab-agent` on Forgejo. It covers every repo where the
   `mcc-lab-agent` app is installed, including Jeff's personal GitHub repos, not
