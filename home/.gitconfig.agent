@@ -43,3 +43,7 @@
 [credential "https://forgejo.lab.mccarrell.org"]
 	helper =
 	helper = lab-forgejo
+[core]
+	quotepath = on
+[diff]
+	relative = true
