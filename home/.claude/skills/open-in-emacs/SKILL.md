@@ -1,6 +1,6 @@
 ---
 name: open-in-emacs
-description: Open a file or directory in Jeff's running Emacs with `emacsclient`, optionally at a line and column. Use when Jeff says "open X in emacs", "show me that in emacs", "jump to line N in emacs", or asks to see a file in his editor. The desktop app's "Open in" menu and its open-in-editor tool have no Emacs entry, so this replaces them.
+description: Open a file or directory in Jeff's running Emacs with `emacsclient`, optionally at a line and column. Use when a message starts with "open in emacs" followed by a path or file name (e.g. "open in emacs init.el", "open in emacs foo.py:42"), or when Jeff otherwise asks to see a file in Emacs or his editor. The desktop app's "Open in" menu and its open-in-editor tool have no Emacs entry, so this replaces them.
 ---
 
 # Open in Emacs
@@ -23,6 +23,9 @@ Then bring Emacs to the front, since `emacsclient -n` leaves focus where it was:
 open -a Emacs
 ```
 
+- The request usually reads `open in emacs <name>`, where `<name>` may be a bare file
+  name, a relative path, or `name:LINE`. Resolve it against the working directory
+  first, then search the session's folders; if several files match, ask which one.
 - Always pass `-n`: without it the command blocks until Jeff finishes the buffer.
 - Pass absolute paths; `+LINE` applies only to the file right after it.
 - If it fails with `can't find socket`, the server isn't running. Say so and stop.
