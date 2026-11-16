@@ -546,10 +546,7 @@ gs_ebooks() {
 }
 
 gs_literate-emacs-d() {
-    local status=0
-    git_sync "$(jwm_dir)/proj/emacs-config" origin || status=1
-    git_sync "$(jwm_dir)/proj/emacs-config/literate-emacs.d" origin || status=1
-    return "$status"
+    git_sync "$(jwm_dir)/proj/literate-emacs.d" origin
 }
 
 gs_mark43_notes() {
@@ -619,8 +616,8 @@ gs_lab() {
     return "$status"
 }
 
-gs_tome() {
-    git_sync "$(jwm_dir)/proj/tome/tome" origin
+gs_agent_home() {
+    git_sync "$(jwm_dir)/proj/agent-home" origin
 }
 
 # The repo groups below are split by which machine the repos live on, so that
@@ -653,7 +650,7 @@ gs_jwm_host() {
     gs_jwm_pdata_notes  || { GS_FAILURES+=(jwm_pdata_notes);  status=1; }
     gs_ebooks           || { GS_FAILURES+=(ebooks);           status=1; }
     gs_lab              || { GS_FAILURES+=(lab);              status=1; }
-    gs_tome             || { GS_FAILURES+=(tome);             status=1; }
+    gs_agent_home       || { GS_FAILURES+=(agent_home);       status=1; }
     return "$status"
 }
 

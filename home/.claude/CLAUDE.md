@@ -209,13 +209,13 @@ and ask. Never work around it.
 These workspaces are named per machine. **A name that does not exist on this machine
 does not apply here** — ignore it rather than treating it as missing.
 
-### /Users/jeff/jwm/proj/emacs-config
-Jeff's Emacs configuration workspace — itself a git repo — containing:
-- `literate-emacs.d/` — a plain git repo; active config project
-- `reference-emacs-configs/` — cloned reference configs, read-only inspiration
+### /Users/jeff/jwm/proj/literate-emacs.d
+Jeff's Emacs configuration — a plain git repo.
+See `literate-emacs.d/AGENTS.md` for project conventions.
 
-See `emacs-config/CLAUDE.md` for full workspace layout.
-See `emacs-config/literate-emacs.d/CLAUDE.md` for project conventions.
+### /Users/jeff/jwm/proj/agent-home
+Jeff's home repo, lyra only: shared agent docs, the wiki, the Claude Code plugin,
+and a pointer to every repo. See `agent-home/AGENTS.md`.
 
 ### /Users/jeff/jwm/proj/jwm-dotfiles-2024
 Dotfiles repo — a plain git repo. Everything it installs lives under `home/`, which
