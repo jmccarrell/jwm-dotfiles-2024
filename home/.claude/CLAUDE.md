@@ -153,7 +153,7 @@ Claude may do these without asking:
 - after Jeff merges a PR: `wt remove <slug>` for the branch Claude created —
   and the remote branch too, if Claude created it and the host didn't already
   auto-delete it — provided nothing outside the repo depends on that checkout
-  (each project's CLAUDE.md defines its own checks)
+  (each project's AGENTS.md or CLAUDE.md defines its own checks)
 - **fast-forward a main checkout to its remote** — `git fetch --prune`, then
   `git pull --ff-only`. Only the fast-forward form: it replicates a merge already
   made on the forge, it never creates one. **Refuse and report if the checkout is
@@ -178,9 +178,9 @@ Claude must never do these itself — it hands Jeff the exact command instead:
   which squashes, rebases, and fast-forwards the target in a single step.
   Fast-forwarding main to its own remote is **not** this (see above): it replicates
   a decision already made on the forge rather than making one. A repo may grant an
-  exception in **its own CLAUDE.md**, naming the exact operation — a grant covers
-  only what it names, and `wt merge` must be named explicitly, because it rewrites
-  history as well as merging
+  exception in **its own AGENTS.md or CLAUDE.md**, naming the exact operation — a
+  grant covers only what it names, and `wt merge` must be named explicitly, because it
+  rewrites history as well as merging
 - delete any branch that is unmerged, or that Claude did not create — including
   `wt remove -D`, which force-deletes unmerged branches
 - rewrite pushed history — no rebase, amend, or reset of commits that are
